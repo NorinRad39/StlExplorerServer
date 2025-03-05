@@ -1,44 +1,46 @@
+using StlExplorerServer.Repositories;
+using StlExplorerServer.Services;
+using StlExplorerServer.Data;
+using Pomelo.EntityFrameworkCore.MySql;
+using Microsoft.EntityFrameworkCore;
+
+// Crée une nouvelle instance de WebApplicationBuilder pour configurer l'application
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+// Ajoute des services au conteneur de dépendances
+
+// Ajoute les services nécessaires pour explorer et générer la documentation Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Inscrit les services personnalisés pour le scanner de dossiers et le référentiel de métadonnées
+builder.Services.AddScoped<IFolderScannerService, FolderScannerService>();
+builder.Services.AddScoped<IMetadataRepository, MetadataRepository>();
+
+// Configure le contexte de base de données pour utiliser MariaDB avec la chaîne de connexion spécifiée
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseMySql(
+        builder.Configuration.GetConnectionString("DefaultConnection"),
+        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
+    ));
+
+// Construit l'application avec les services configurés
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
+// Configure le pipeline de requêtes HTTP
+
+// Mappe les contrôleurs pour gérer les requêtes HTTP
+app.MapControllers();
+
+// Si l'application est en mode développement, active Swagger pour la documentation de l'API
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
 }
 
+// Redirige les requêtes HTTP vers HTTPS pour sécuriser les communications
 app.UseHttpsRedirection();
 
-var summaries = new[]
-{
-    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
-};
-
-app.MapGet("/weatherforecast", () =>
-{
-    var forecast = Enumerable.Range(1, 5).Select(index =>
-        new WeatherForecast
-        (
-            DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
-            Random.Shared.Next(-20, 55),
-            summaries[Random.Shared.Next(summaries.Length)]
-        ))
-        .ToArray();
-    return forecast;
-})
-.WithName("GetWeatherForecast")
-.WithOpenApi();
-
+// Démarre l'application et commence à écouter les requêtes entrantes
 app.Run();
-
-internal record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
-{
-    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
-}

@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StlExplorerServer.Data;
 
@@ -10,9 +11,11 @@ using StlExplorerServer.Data;
 namespace StlExplorerServer.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250307201423_UpdateFamilySubjectPacketRelationships")]
+    partial class UpdateFamilySubjectPacketRelationships
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,7 +37,7 @@ namespace StlExplorerServer.Migrations
 
                     b.HasKey("FamilleID");
 
-                    b.ToTable("Familles");
+                    b.ToTable("Famille");
                 });
 
             modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>
@@ -76,7 +79,7 @@ namespace StlExplorerServer.Migrations
 
                     b.HasIndex("FamilleID");
 
-                    b.ToTable("Sujets");
+                    b.ToTable("Sujet");
                 });
 
             modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>

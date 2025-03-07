@@ -13,6 +13,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Ajoute les services de contrôleurs
+builder.Services.AddControllers();
+
 // Inscrit les services personnalisés pour le scanner de dossiers et le référentiel de métadonnées
 builder.Services.AddScoped<IFolderScannerService, FolderScannerService>();
 builder.Services.AddScoped<IMetadataRepository, MetadataRepository>();
@@ -23,6 +26,11 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
         builder.Configuration.GetConnectionString("DefaultConnection"),
         ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
     ));
+
+// Ajoute les services de journalisation
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddDebug();
 
 // Construit l'application avec les services configurés
 var app = builder.Build();
@@ -40,7 +48,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Redirige les requêtes HTTP vers HTTPS pour sécuriser les communications
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 
 // Démarre l'application et commence à écouter les requêtes entrantes
 app.Run();

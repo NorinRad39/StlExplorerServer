@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using StlExplorerServer.Services;
+using Microsoft.Extensions.Logging;
 
 namespace StlExplorerServer.Controllers
 {
@@ -9,35 +10,34 @@ namespace StlExplorerServer.Controllers
     [Route("api/[controller]")]
     public class MetadataController : ControllerBase
     {
-        // Déclare une variable privée pour stocker une instance de IFolderScannerService
         private readonly IFolderScannerService _folderScannerService;
+        private readonly ILogger<MetadataController> _logger;
 
-        // Constructeur du contrôleur qui accepte une instance de IFolderScannerService
-        // L'injection de dépendances fournira automatiquement cette instance lors de la création du contrôleur
-        public MetadataController(IFolderScannerService folderScannerService)
+        // Constructeur du contrôleur qui accepte une instance de IFolderScannerService et ILogger
+        public MetadataController(IFolderScannerService folderScannerService, ILogger<MetadataController> logger)
         {
             _folderScannerService = folderScannerService;
+            _logger = logger;
         }
 
         // Définit un endpoint HTTP POST pour scanner un dossier
-        // L'URL pour accéder à cet endpoint sera "api/metadata/scan"
         [HttpPost("scan")]
         public IActionResult ScanFolder([FromBody] string path)
         {
+            _logger.LogInformation("Requête reçue pour scanner le dossier : {Path}", path);
+
             try
             {
                 // Appelle le service pour scanner le dossier au chemin spécifié
                 _folderScannerService.ScanFolder(path);
-                // Retourne une réponse HTTP 200 OK avec un message de succès
+                _logger.LogInformation("Dossier scanné avec succès.");
                 return Ok("Folder scanned successfully.");
             }
             catch (Exception ex)
             {
-                // En cas d'erreur, retourne une réponse HTTP 500 avec le message d'erreur
+                _logger.LogError(ex, "Erreur interne du serveur lors du scan du dossier : {Path}", path);
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
     }
-
-
 }

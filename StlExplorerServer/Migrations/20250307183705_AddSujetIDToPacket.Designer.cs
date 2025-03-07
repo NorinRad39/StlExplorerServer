@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StlExplorerServer.Data;
 
@@ -10,9 +11,11 @@ using StlExplorerServer.Data;
 namespace StlExplorerServer.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250307183705_AddSujetIDToPacket")]
+    partial class AddSujetIDToPacket
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,7 +37,7 @@ namespace StlExplorerServer.Migrations
 
                     b.HasKey("FamilleID");
 
-                    b.ToTable("Familles");
+                    b.ToTable("Famille");
                 });
 
             modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>
@@ -76,13 +79,13 @@ namespace StlExplorerServer.Migrations
 
                     b.HasIndex("FamilleID");
 
-                    b.ToTable("Sujets");
+                    b.ToTable("Sujet");
                 });
 
             modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>
                 {
                     b.HasOne("ClassLibStlExploServ.Sujet", "Sujet")
-                        .WithMany("Packets")
+                        .WithMany()
                         .HasForeignKey("SujetID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -93,22 +96,12 @@ namespace StlExplorerServer.Migrations
             modelBuilder.Entity("ClassLibStlExploServ.Sujet", b =>
                 {
                     b.HasOne("ClassLibStlExploServ.Famille", "Famille")
-                        .WithMany("Sujets")
+                        .WithMany()
                         .HasForeignKey("FamilleID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Famille");
-                });
-
-            modelBuilder.Entity("ClassLibStlExploServ.Famille", b =>
-                {
-                    b.Navigation("Sujets");
-                });
-
-            modelBuilder.Entity("ClassLibStlExploServ.Sujet", b =>
-                {
-                    b.Navigation("Packets");
                 });
 #pragma warning restore 612, 618
         }

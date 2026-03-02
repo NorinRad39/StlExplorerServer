@@ -10,10 +10,10 @@ using ClassLibStlExploServ;
         public interface IMetadataRepository
         {
             /// <summary>
-            /// Enregistre les métadonnées d'un paquet.
+            /// Enregistre les métadonnées d'un modèle.
             /// </summary>
-            /// <param name="packet">Le paquet de métadonnées à enregistrer.</param>
-            void SaveMetadata(Packet packet);
+            /// <param name="modele">Le modèle de métadonnées à enregistrer.</param>
+            void SaveModele(Modele modele);
 
             /// <summary>
             /// Récupère un sujet par son nom.

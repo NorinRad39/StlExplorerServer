@@ -26,12 +26,12 @@ namespace StlExplorerServer.Repositories
         }
 
         /// <summary>
-        /// Enregistre les métadonnées d'un paquet dans la base de données.
+        /// Enregistre les métadonnées d'un modèle dans la base de données.
         /// </summary>
-        /// <param name="packet">Le paquet de métadonnées à enregistrer.</param>
-        public void SaveMetadata(Packet packet)
+        /// <param name="modele">Le modèle de métadonnées à enregistrer.</param>
+        public void SaveModele(Modele modele)
         {
-            _context.Packets.Add(packet);
+            _context.Modeles.Add(modele);
             _context.SaveChanges();
         }
 

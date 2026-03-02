@@ -38,13 +38,13 @@ namespace StlExplorerServer.Services
             if (Directory.Exists(path))
             {
                 // Récupère les dossiers les plus bas dans l'arborescence
-                var paketDirectories = GetPaketDirectories(new DirectoryInfo(path));
+                var modeleDirectories = GetModeleDirectories(new DirectoryInfo(path));
 
-                // Parcourt chaque dossier et crée un paquet de métadonnées
-                foreach (var directory in paketDirectories)
+                // Parcourt chaque dossier et crée un modèle de métadonnées
+                foreach (var directory in modeleDirectories)
                 {
-                    var packet = CreatePacketForDirectory(directory);
-                    _metadataRepository.SaveMetadata(packet);
+                    var modele = CreateModeleForDirectory(directory);
+                    _metadataRepository.SaveModele(modele);
                 }
             }
             else
@@ -59,7 +59,7 @@ namespace StlExplorerServer.Services
         /// </summary>
         /// <param name="directory">Le répertoire à parcourir.</param>
         /// <returns>Une collection de dossiers les plus bas.</returns>
-        private IEnumerable<DirectoryInfo> GetPaketDirectories(DirectoryInfo directory)
+        private IEnumerable<DirectoryInfo> GetModeleDirectories(DirectoryInfo directory)
         {
             var subDirectories = directory.GetDirectories();
             if (!subDirectories.Any())
@@ -70,7 +70,7 @@ namespace StlExplorerServer.Services
             {
                 foreach (var subDirectory in subDirectories)
                 {
-                    foreach (var leaf in GetPaketDirectories(subDirectory))
+                    foreach (var leaf in GetModeleDirectories(subDirectory))
                     {
                         yield return leaf;
                     }
@@ -79,19 +79,19 @@ namespace StlExplorerServer.Services
         }
 
         /// <summary>
-        /// Crée un paquet de métadonnées pour un dossier donné.
+        /// Crée un modèle de métadonnées pour un dossier donné.
         /// </summary>
         /// <param name="directory">Le répertoire pour lequel créer les métadonnées.</param>
-        /// <returns>Une instance de Packet contenant les métadonnées.</returns>
-        private Packet CreatePacketForDirectory(DirectoryInfo directory)
+        /// <returns>Une instance de Modele contenant les métadonnées.</returns>
+        private Modele CreateModeleForDirectory(DirectoryInfo directory)
         {
-            var packet = new Packet
+            var modele = new Modele
             {
                 Description = directory.Name,
                 Sujet = GetOrCreateSujet(directory.Parent)
             };
 
-            return packet;
+            return modele;
         }
 
         /// <summary>

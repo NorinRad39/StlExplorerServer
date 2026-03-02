@@ -10,7 +10,7 @@ using Pomelo.EntityFrameworkCore.MySql.Infrastructure;
 namespace StlExplorerServer.Data
 {
     /// <summary>
-    /// Contexte de base de données pour l'application, gérant les entités Packet, Sujet et Famille.
+    /// Contexte de base de données pour l'application, gérant les entités Modele, Sujet et Famille.
     /// </summary>
     public class ApplicationDbContext : DbContext
     {
@@ -26,9 +26,9 @@ namespace StlExplorerServer.Data
         // DbSet pour chaque entité
 
         /// <summary>
-        /// DbSet pour les entités Packet.
+        /// DbSet pour les entités Modele.
         /// </summary>
-        public DbSet<Packet> Packets { get; set; }
+        public DbSet<Modele> Modeles { get; set; }
 
         /// <summary>
         /// DbSet pour les entités Sujet.

@@ -17,7 +17,7 @@
         public string? Description { get; set; }
 
         /// <summary>
-        /// Identifiant du sujet auquel ce paquet est associé.
+        /// Identifiant du sujet auquel ce modèle est associé.
         /// </summary>
         public int SujetID { get; set; }
 
@@ -29,7 +29,7 @@
     }
 
     /// <summary>
-    /// Représente un sujet contenant plusieurs paquets et appartenant à une famille.
+    /// Représente un sujet contenant plusieurs modèles et appartenant à une famille.
     /// </summary>
     public class Sujet
     {

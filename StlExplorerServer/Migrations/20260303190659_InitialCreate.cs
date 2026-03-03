@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace StlExplorerServer.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate_v2 : Migration
+    public partial class InitialCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,72 +15,72 @@ namespace StlExplorerServer.Migrations
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Famille",
+                name: "Familles",
                 columns: table => new
                 {
                     FamilleID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    NomFamille = table.Column<string>(type: "longtext", nullable: false)
+                    NomFamille = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4")
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Famille", x => x.FamilleID);
+                    table.PrimaryKey("PK_Familles", x => x.FamilleID);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Sujet",
+                name: "Sujets",
                 columns: table => new
                 {
                     SujetID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    NomSujet = table.Column<string>(type: "longtext", nullable: false)
+                    NomSujet = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     FamilleID = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Sujet", x => x.SujetID);
+                    table.PrimaryKey("PK_Sujets", x => x.SujetID);
                     table.ForeignKey(
-                        name: "FK_Sujet_Famille_FamilleID",
+                        name: "FK_Sujets_Familles_FamilleID",
                         column: x => x.FamilleID,
-                        principalTable: "Famille",
+                        principalTable: "Familles",
                         principalColumn: "FamilleID",
                         onDelete: ReferentialAction.Cascade);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateTable(
-                name: "Packets",
+                name: "Modeles",
                 columns: table => new
                 {
-                    PacketID = table.Column<int>(type: "int", nullable: false)
+                    ModeleID = table.Column<int>(type: "int", nullable: false)
                         .Annotation("MySql:ValueGenerationStrategy", MySqlValueGenerationStrategy.IdentityColumn),
-                    Description = table.Column<string>(type: "longtext", nullable: false)
+                    Description = table.Column<string>(type: "longtext", nullable: true)
                         .Annotation("MySql:CharSet", "utf8mb4"),
                     SujetID = table.Column<int>(type: "int", nullable: false)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_Packets", x => x.PacketID);
+                    table.PrimaryKey("PK_Modeles", x => x.ModeleID);
                     table.ForeignKey(
-                        name: "FK_Packets_Sujet_SujetID",
+                        name: "FK_Modeles_Sujets_SujetID",
                         column: x => x.SujetID,
-                        principalTable: "Sujet",
+                        principalTable: "Sujets",
                         principalColumn: "SujetID",
                         onDelete: ReferentialAction.Cascade);
                 })
                 .Annotation("MySql:CharSet", "utf8mb4");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Packets_SujetID",
-                table: "Packets",
+                name: "IX_Modeles_SujetID",
+                table: "Modeles",
                 column: "SujetID");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Sujet_FamilleID",
-                table: "Sujet",
+                name: "IX_Sujets_FamilleID",
+                table: "Sujets",
                 column: "FamilleID");
         }
 
@@ -88,13 +88,13 @@ namespace StlExplorerServer.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Packets");
+                name: "Modeles");
 
             migrationBuilder.DropTable(
-                name: "Sujet");
+                name: "Sujets");
 
             migrationBuilder.DropTable(
-                name: "Famille");
+                name: "Familles");
         }
     }
 }

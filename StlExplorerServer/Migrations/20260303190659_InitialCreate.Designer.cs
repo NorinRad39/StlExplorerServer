@@ -11,8 +11,8 @@ using StlExplorerServer.Data;
 namespace StlExplorerServer.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250307183705_AddSujetIDToPacket")]
-    partial class AddSujetIDToPacket
+    [Migration("20260303190659_InitialCreate")]
+    partial class InitialCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -37,16 +37,16 @@ namespace StlExplorerServer.Migrations
 
                     b.HasKey("FamilleID");
 
-                    b.ToTable("Famille");
+                    b.ToTable("Familles");
                 });
 
-            modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>
+            modelBuilder.Entity("ClassLibStlExploServ.Modele", b =>
                 {
-                    b.Property<int>("PacketID")
+                    b.Property<int>("ModeleID")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("PacketID"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("ModeleID"));
 
                     b.Property<string>("Description")
                         .HasColumnType("longtext");
@@ -54,11 +54,11 @@ namespace StlExplorerServer.Migrations
                     b.Property<int>("SujetID")
                         .HasColumnType("int");
 
-                    b.HasKey("PacketID");
+                    b.HasKey("ModeleID");
 
                     b.HasIndex("SujetID");
 
-                    b.ToTable("Packets");
+                    b.ToTable("Modeles");
                 });
 
             modelBuilder.Entity("ClassLibStlExploServ.Sujet", b =>
@@ -79,13 +79,13 @@ namespace StlExplorerServer.Migrations
 
                     b.HasIndex("FamilleID");
 
-                    b.ToTable("Sujet");
+                    b.ToTable("Sujets");
                 });
 
-            modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>
+            modelBuilder.Entity("ClassLibStlExploServ.Modele", b =>
                 {
                     b.HasOne("ClassLibStlExploServ.Sujet", "Sujet")
-                        .WithMany()
+                        .WithMany("Modeles")
                         .HasForeignKey("SujetID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -96,12 +96,22 @@ namespace StlExplorerServer.Migrations
             modelBuilder.Entity("ClassLibStlExploServ.Sujet", b =>
                 {
                     b.HasOne("ClassLibStlExploServ.Famille", "Famille")
-                        .WithMany()
+                        .WithMany("Sujets")
                         .HasForeignKey("FamilleID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Famille");
+                });
+
+            modelBuilder.Entity("ClassLibStlExploServ.Famille", b =>
+                {
+                    b.Navigation("Sujets");
+                });
+
+            modelBuilder.Entity("ClassLibStlExploServ.Sujet", b =>
+                {
+                    b.Navigation("Modeles");
                 });
 #pragma warning restore 612, 618
         }

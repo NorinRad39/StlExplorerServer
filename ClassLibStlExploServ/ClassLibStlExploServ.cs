@@ -40,12 +40,8 @@
         #region Propriétés de Navigation et Clés Étrangères
 
         /// <summary>
-<<<<<<< HEAD
-        /// Identifiant du sujet auquel ce modèle est associé.
-=======
         /// Identifiant du sujet auquel ce modèle est associé (Clé étrangère).
         /// Permet de faire le lien avec la table des sujets dans la base de données.
->>>>>>> f663de946dc24c2783f2104c9b11935c70932be3
         /// </summary>
         public int SujetID { get; set; }
 
@@ -65,10 +61,7 @@
 
     /// <summary>
     /// Représente un sujet contenant plusieurs modèles et appartenant à une famille.
-<<<<<<< HEAD
-=======
     /// C'est le niveau intermédiaire de la hiérarchie.
->>>>>>> f663de946dc24c2783f2104c9b11935c70932be3
     /// </summary>
     /// <remarks>
     /// Un <see cref="Sujet"/> regroupe généralement plusieurs <see cref="Modele"/> et appartient à une seule <see cref="Famille"/>.

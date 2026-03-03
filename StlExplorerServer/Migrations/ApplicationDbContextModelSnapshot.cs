@@ -37,13 +37,13 @@ namespace StlExplorerServer.Migrations
                     b.ToTable("Familles");
                 });
 
-            modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>
+            modelBuilder.Entity("ClassLibStlExploServ.Modele", b =>
                 {
-                    b.Property<int>("PacketID")
+                    b.Property<int>("ModeleID")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("int");
 
-                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("PacketID"));
+                    MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("ModeleID"));
 
                     b.Property<string>("Description")
                         .HasColumnType("longtext");
@@ -51,11 +51,11 @@ namespace StlExplorerServer.Migrations
                     b.Property<int>("SujetID")
                         .HasColumnType("int");
 
-                    b.HasKey("PacketID");
+                    b.HasKey("ModeleID");
 
                     b.HasIndex("SujetID");
 
-                    b.ToTable("Packets");
+                    b.ToTable("Modeles");
                 });
 
             modelBuilder.Entity("ClassLibStlExploServ.Sujet", b =>
@@ -79,10 +79,10 @@ namespace StlExplorerServer.Migrations
                     b.ToTable("Sujets");
                 });
 
-            modelBuilder.Entity("ClassLibStlExploServ.Packet", b =>
+            modelBuilder.Entity("ClassLibStlExploServ.Modele", b =>
                 {
                     b.HasOne("ClassLibStlExploServ.Sujet", "Sujet")
-                        .WithMany("Packets")
+                        .WithMany("Modeles")
                         .HasForeignKey("SujetID")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -108,7 +108,7 @@ namespace StlExplorerServer.Migrations
 
             modelBuilder.Entity("ClassLibStlExploServ.Sujet", b =>
                 {
-                    b.Navigation("Packets");
+                    b.Navigation("Modeles");
                 });
 #pragma warning restore 612, 618
         }

@@ -20,7 +20,7 @@ using ClassLibStlExploServ;
             /// </summary>
             /// <param name="name">Le nom du sujet à rechercher.</param>
             /// <returns>Le sujet correspondant, ou null s'il n'existe pas.</returns>
-            Sujet GetSujetByName(string name);
+            Sujet? GetSujetByName(string name);
 
             /// <summary>
             /// Enregistre un nouveau sujet.
@@ -33,7 +33,7 @@ using ClassLibStlExploServ;
             /// </summary>
             /// <param name="name">Le nom de la famille à rechercher.</param>
             /// <returns>La famille correspondante, ou null si elle n'existe pas.</returns>
-            Famille GetFamilleByName(string name);
+            Famille? GetFamilleByName(string name);
 
             /// <summary>
             /// Enregistre une nouvelle famille.
@@ -42,5 +42,6 @@ using ClassLibStlExploServ;
             void SaveFamille(Famille famille);
         }
     }
+
 
 

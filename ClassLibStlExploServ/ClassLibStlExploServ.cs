@@ -111,7 +111,7 @@
         /// Elle est initialisée par défaut avec une liste vide pour éviter les erreurs de type "NullReferenceException"
         /// lors de l'ajout d'un nouvel élément avec <c>Modeles.Add(...)</c>.
         /// </summary>
-        public ICollection<Modele> Modeles { get; set; } = new List<Modele>();
+        public ICollection<Modele> Modeles { get; set; } = [];
 
         #endregion
     }
@@ -162,7 +162,7 @@
         /// Initialisée avec une nouvelle liste pour pouvoir y ajouter facilement des éléments.
         /// Une <see cref="ICollection{T}"/> est l'interface standard utilisée par Entity Framework pour les relations "Un-à-Plusieurs" (One-to-Many).
         /// </summary>
-        public ICollection<Sujet> Sujets { get; set; } = new List<Sujet>();
+        public ICollection<Sujet> Sujets { get; set; } = [];
 
         #endregion
     }

@@ -18,24 +18,8 @@ namespace StlExplorerServer.Data
     ///     options.UseMySql(connectionString, serverVersion));
     /// </code>
     /// </example>
-    public class ApplicationDbContext : DbContext
+    public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : DbContext(options)
     {
-        #region Constructeur
-
-        /// <summary>
-        /// Initialise une nouvelle instance de la classe <see cref="ApplicationDbContext"/>.
-        /// </summary>
-        /// <param name="options">
-        /// Les options de configuration pour le contexte, contenant par exemple la chaîne de connexion 
-        /// et le fournisseur de base de données à utiliser.
-        /// </param>
-        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-            : base(options)
-        {
-        }
-
-        #endregion
-
         #region Entités (DbSets)
 
         /// <summary>

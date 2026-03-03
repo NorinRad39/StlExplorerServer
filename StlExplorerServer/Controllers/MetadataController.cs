@@ -20,42 +20,8 @@ namespace StlExplorerServer.Controllers
     /// </remarks>
     [ApiController]
     [Route("api/[controller]")]
-    public class MetadataController : ControllerBase
+    public class MetadataController(IFolderScannerService folderScannerService, ILogger<MetadataController> logger) : ControllerBase
     {
-        #region Champs Privés (Dépendances)
-
-        /// <summary>
-        /// Service qui gère la logique de scan des dossiers.
-        /// </summary>
-        private readonly IFolderScannerService _folderScannerService;
-
-        /// <summary>
-        /// Outil de journalisation pour tracer ce qu'il se passe sur le serveur.
-        /// </summary>
-        private readonly ILogger<MetadataController> _logger;
-
-        #endregion
-
-        #region Constructeur
-
-        /// <summary>
-        /// Initialise une nouvelle instance de la classe <see cref="MetadataController"/>
-        /// </summary>
-        /// <param name="folderScannerService">
-        /// Instance pointant vers l'implémentation de <see cref="IFolderScannerService"/>. 
-        /// Fournie automatiquement par l'Injection de Dépendances (DI) configurée dans Program.cs.
-        /// </param>
-        /// <param name="logger">
-        /// Composant permettant d'écrire des logs (informations, erreurs) dans la console ou des fichiers.
-        /// </param>
-        public MetadataController(IFolderScannerService folderScannerService, ILogger<MetadataController> logger)
-        {
-            _folderScannerService = folderScannerService;
-            _logger = logger;
-        }
-
-        #endregion
-
         #region Points de Terminaison (Endpoints)
 
         /// <summary>
@@ -89,24 +55,20 @@ namespace StlExplorerServer.Controllers
         [HttpPost("scan")]
         public IActionResult ScanFolder([FromBody] string path)
         {
-            _logger.LogInformation("Requête reçue pour scanner le dossier : {Path}", path);
+            logger.LogInformation("Requête reçue pour scanner le dossier : {Path}", path);
 
             try
             {
-                // Appelle le service métier pour faire le travail lourd de lecture des dossiers.
-                _folderScannerService.ScanFolder(path);
+                folderScannerService.ScanFolder(path);
 
-                _logger.LogInformation("Dossier scanné avec succès.");
+                logger.LogInformation("Dossier scanné avec succès.");
                 
-                // Renvoie une réponse HTTP 200 (OK) au client avec un petit message.
                 return Ok("Folder scanned successfully.");
             }
             catch (Exception ex)
             {
-                // On logge l'erreur complète pour les développeurs, mais on renvoie juste le message au client.
-                _logger.LogError(ex, "Erreur interne du serveur lors du scan du dossier : {Path}", path);
+                logger.LogError(ex, "Erreur interne du serveur lors du scan du dossier : {Path}", path);
                 
-                // StatusCode 500 indique qu'une erreur inattendue (exception) vient du serveur.
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }

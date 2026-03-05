@@ -33,6 +33,13 @@ Les fichiers sont organisés physiquement et logiquement selon la hiérarchie su
 - Sujet : Galactus
 - Modèle : Galactus - Statue wicked (contient les fichiers STL et images)
 
+### Stratégie d'Indexation (Arborescence à Profondeur Fixe)
+Afin de permettre la création de sous-dossiers de travail (ex: "fichiers réparés", "évidés", "supports") sans briser le système, l'indexation base sa logique sur une approche à **profondeur fixe** depuis le répertoire racine du scan, et non sur la recherche de dossiers terminaux (sans enfants) :
+- **Niveau 1** (sous la racine) = Famille
+- **Niveau 2** = Sujet
+- **Niveau 3** = Modèle
+Tout dossier situé à un niveau supérieur (Niveau 4 et +) est ignoré par le scanner de l'architecture et considéré comme appartenant au Modèle du niveau 3 parent.
+
 ## Fonctionnalités Clés (Roadmap)
 1.  **Indexation (Scan) :**
     - Parcourir les dossiers du NAS.

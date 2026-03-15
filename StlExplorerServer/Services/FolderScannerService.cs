@@ -1,9 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq; // Nécessaire pour l'utilisation de .Any()
+using System.Linq;
 using ClassLibStlExploServ;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using StlExplorerServer.Repositories;
 
 namespace StlExplorerServer.Services
@@ -17,39 +18,8 @@ namespace StlExplorerServer.Services
     /// Ce service parcourt une arborescence de fichiers sur le disque dur et mappe cette arborescence
     /// vers nos objets métiers métier <see cref="Famille"/>, <see cref="Sujet"/> et <see cref="Modele"/>.
     /// </remarks>
-    public class FolderScannerService : IFolderScannerService
+    public class FolderScannerService(IMetadataRepository metadataRepository, ILogger<FolderScannerService> logger, IConfiguration configuration) : IFolderScannerService
     {
-        #region Propriétés Privées (Dépendances)
-        
-        /// <summary>
-        /// Référentiel (Repository) utilisé pour sauvegarder et récupérer nos données en base.
-        /// </summary>
-        private readonly IMetadataRepository _metadataRepository;
-
-        /// <summary>
-        /// Outil de journalisation (Logger) pour enregistrer des messages (erreurs, infos) lors de l'exécution.
-        /// </summary>
-        private readonly ILogger<FolderScannerService> _logger;
-
-        #endregion
-
-        #region Constructeur
-
-        /// <summary>
-        /// Initialise une nouvelle instance du service <see cref="FolderScannerService"/>.
-        /// Utilise le principe d'"Injection de Dépendances" : c'est l'application qui fournit automatiquement 
-        /// le repository et le logger lors de la création de ce service.
-        /// </summary>
-        /// <param name="metadataRepository">L'accès aux données (base de données).</param>
-        /// <param name="logger">L'outil d'enregistrement des journaux (logs).</param>
-        public FolderScannerService(IMetadataRepository metadataRepository, ILogger<FolderScannerService> logger)
-        {
-            _metadataRepository = metadataRepository;
-            _logger = logger;
-        }
-
-        #endregion
-
         #region Méthodes Publiques
 
         /// <summary>
@@ -65,28 +35,51 @@ namespace StlExplorerServer.Services
         /// </example>
         public void ScanFolder(string path)
         {
-            // Étape 1 : S'assurer que le chemin fourni est valide et existe bien sur le disque dur.
             if (Directory.Exists(path))
             {
-                _logger.LogInformation("Début du scan pour le chemin : {Path}", path);
+                logger.LogInformation("Début du scan pour le chemin : {Path}", path);
 
-                // Étape 2 : Récupérer tous les dossiers "terminaux" (qui ne contiennent aucun sous-dossier).
                 var modeleDirectories = GetModeleDirectories(new DirectoryInfo(path));
 
-                // Étape 3 : Pour chaque dossier terminal, on crée l'architecture (Modele, Sujet, Famille).
                 foreach (var directory in modeleDirectories)
                 {
-                    var modele = CreateModeleForDirectory(directory);
-                    
-                    // On sauvegarde le modèle en base de données de manière persistante.
-                    _metadataRepository.SaveModele(modele);
+                    // Nous déléguons la gestion des doublons dans la méthode dédiée
+                    GetOrCreateModele(directory);
                 }
             }
             else
             {
-                // Si le répertoire est introuvable, on alerte le programme appelant en "jetant" (throw) une erreur.
-                _logger.LogError("Le répertoire spécifié n'existe pas : {Path}", path);
+                logger.LogError("Le répertoire spécifié n'existe pas : {Path}", path);
                 throw new DirectoryNotFoundException($"Le répertoire spécifié n'existe pas : {path}");
+            }
+        }
+
+        /// <summary>
+        /// Scanne tous les dossiers configurés dans le fichier de configuration de l'application.
+        /// </summary>
+        public void ScanAllConfiguredFolders()
+        {
+            // Lire la liste depuis le appsettings.json
+            var rootDirs = configuration.GetSection("ScannerSettings:RootDirectories").Get<string[]>();
+
+            if (rootDirs == null || rootDirs.Length == 0)
+            {
+                logger.LogWarning("Aucun dossier racine configuré dans appsettings.json.");
+                return;
+            }
+
+            foreach (var dir in rootDirs)
+            {
+                try
+                {
+                    logger.LogInformation("Lancement du scan pour le dossier configuré : {Dir}", dir);
+                    ScanFolder(dir); // Appelle votre méthode existante
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex, "Erreur lors du scan du dossier {Dir}", dir);
+                    // On continue avec le dossier suivant même si un a planté
+                }
             }
         }
 
@@ -95,31 +88,27 @@ namespace StlExplorerServer.Services
         #region Méthodes Privées (Logique Interne)
 
         /// <summary>
-        /// Parcourt l'arborescence de manière récursive (une fonction qui s'appelle elle-même)
-        /// pour isoler les dossiers les plus bas ("feuilles" de l'arbre).
+        /// Parcourt l'arborescence selon une règle stricte de profondeur (Profondeur Fixe à 3 niveaux).
+        /// Famille (Niveau 1) -> Sujet (Niveau 2) -> Modele (Niveau 3).
+        /// Les sous-dossiers au-delà du Niveau 3 (ex: 'reparé', 'evidé') appartiennent au Modele parent
+        /// et ne sont JAMAIS considérés comme un niveau hiérarchique principal.
         /// </summary>
-        /// <param name="directory">Le répertoire courant en train d'être analysé.</param>
-        /// <returns>Une énumération des dossiers terminaux (qui ne contiennent plus d'autres dossiers).</returns>
-        private IEnumerable<DirectoryInfo> GetModeleDirectories(DirectoryInfo directory)
+        /// <param name="rootDirectory">Le dossier racine à partir duquel commencer le scan (Niveau 1 - Famille).</param>
+        /// <returns>Une collection de tous les dossiers de niveau 3 (Modele) trouvés.</returns>
+        private static IEnumerable<DirectoryInfo> GetModeleDirectories(DirectoryInfo rootDirectory)
         {
-            // On récupère tous les sous-dossiers directs contenus dans ce dossier.
-            var subDirectories = directory.GetDirectories();
-            
-            // Si le dossier ne contient AUCUN sous-dossier, on considère que c'est un dossier "Modele".
-            if (!subDirectories.Any())
+            // Niveau 1 : Famille - On parcourt les dossiers de Familles
+            foreach (var familleDir in rootDirectory.GetDirectories())
             {
-                // yield return permet de renvoyer l'élément un par un sans devoir créer une liste entière au préalable
-                yield return directory;
-            }
-            else
-            {
-                // Si le dossier contient des sous-dossiers, on descend d'un niveau...
-                foreach (var subDirectory in subDirectories)
+                // Niveau 2 : Sujet - Pour chaque Famille, on parcourt les dossiers de Sujets
+                foreach (var sujetDir in familleDir.GetDirectories())
                 {
-                    // ... et on rappelle cette MÊME fonction pour le sous-dossier (principe de la récursivité).
-                    foreach (var leaf in GetModeleDirectories(subDirectory))
+                    // Niveau 3 : Modele - Pour chaque Sujet, on parcourt les dossiers de Modèles
+                    foreach (var modeleDir in sujetDir.GetDirectories())
                     {
-                        yield return leaf;
+                        // Les sous-dossiers au-delà (Niveau 4+) comme 'reparé', 'evidé' à l'intérieur de modeleDir
+                        // ne seront JAMAIS parcourus par cette boucle, ils sont sains et saufs !
+                        yield return modeleDir;
                     }
                 }
             }
@@ -157,7 +146,7 @@ namespace StlExplorerServer.Services
             }
 
             // On interroge la base de données : Ce sujet existe-t-il déjà ?
-            var existingSujet = _metadataRepository.GetSujetByName(parentDirectory.Name);
+            var existingSujet = metadataRepository.GetSujetByName(parentDirectory.Name);
             if (existingSujet != null)
             {
                 return existingSujet;
@@ -172,7 +161,7 @@ namespace StlExplorerServer.Services
             };
 
             // On l'enregistre dans la base de données après sa création
-            _metadataRepository.SaveSujet(sujet);
+            metadataRepository.SaveSujet(sujet);
             
             return sujet;
         }
@@ -190,7 +179,7 @@ namespace StlExplorerServer.Services
             }
 
             // Vérifier en base si cette famille a déjà été traitée lors d'un passage précédent
-            var existingFamille = _metadataRepository.GetFamilleByName(grandParentDirectory.Name);
+            var existingFamille = metadataRepository.GetFamilleByName(grandParentDirectory.Name);
             if (existingFamille != null)
             {
                 return existingFamille;
@@ -202,9 +191,36 @@ namespace StlExplorerServer.Services
                 NomFamille = grandParentDirectory.Name
             };
 
-            _metadataRepository.SaveFamille(famille);
+            metadataRepository.SaveFamille(famille);
             
             return famille;
+        }
+
+        /// <summary>
+        /// Vérifie si un Modèle existe, et le crée en base de données si ce n'est pas le cas.
+        /// </summary>
+        /// <param name="directory">Le dossier au bout de la branche.</param>
+        /// <returns>Un objet Modele (nouveau ou existant).</returns>
+        private Modele GetOrCreateModele(DirectoryInfo directory)
+        {
+            // Évite la création en double si le scan est relancé
+            var existingModele = metadataRepository.GetModeleByChemin(directory.FullName);
+            if (existingModele != null)
+            {
+                return existingModele;
+            }
+
+            // On instancie notre entité métier
+            var modele = new Modele
+            {
+                Description = directory.Name,
+                CheminDossier = directory.FullName, // Renseignement du chemin physique (Très important !)
+                Sujet = GetOrCreateSujet(directory.Parent)
+            };
+
+            // On sauvegarde le modèle (l'appel à SaveModele a été déplacé ici)
+            metadataRepository.SaveModele(modele);
+            return modele;
         }
 
         #endregion

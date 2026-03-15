@@ -35,6 +35,12 @@
         /// </summary>
         public string? Description { get; set; }
 
+        /// <summary>
+        /// Chemin du dossier où le fichier associé au modèle est stocké.
+        /// Utile pour retrouver facilement les fichiers physiques sur le disque.
+        /// </summary>
+        public string? CheminDossier { get; set; }
+
         #endregion
 
         #region Propriétés de Navigation et Clés Étrangères

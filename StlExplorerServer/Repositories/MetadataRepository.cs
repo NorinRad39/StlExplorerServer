@@ -31,7 +31,7 @@ namespace StlExplorerServer.Repositories
     /// }
     /// </code>
     /// </example>
-    public class MetadataRepository : IMetadataRepository
+    public class MetadataRepository(ApplicationDbContext context, ILogger<MetadataRepository> logger) : IMetadataRepository
     {
         #region Champs Privés (Dépendances)
 
@@ -39,27 +39,12 @@ namespace StlExplorerServer.Repositories
         /// Le contexte de la base de données généré par Entity Framework Core.
         /// Il sert à interagir avec les tables de la base.
         /// </summary>
-        private readonly ApplicationDbContext _context;
+        private readonly ApplicationDbContext _context = context;
 
         /// <summary>
         /// Le service de journalisation (Logger) pour enregistrer les informations ou les erreurs.
         /// </summary>
-        private readonly ILogger<MetadataRepository> _logger;
-
-        #endregion
-
-        #region Constructeur
-
-        /// <summary>
-        /// Initialise une nouvelle instance de la classe <see cref="MetadataRepository"/>.
-        /// </summary>
-        /// <param name="context">Le contexte de la base de données injecté automatiquement.</param>
-        /// <param name="logger">Le logger injecté automatiquement.</param>
-        public MetadataRepository(ApplicationDbContext context, ILogger<MetadataRepository> logger)
-        {
-            _context = context;
-            _logger = logger;
-        }
+        private readonly ILogger<MetadataRepository> _logger = logger;
 
         #endregion
 

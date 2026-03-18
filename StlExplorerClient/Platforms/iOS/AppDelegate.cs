@@ -1,6 +1,6 @@
 ﻿using Foundation;
 
-namespace StlExplorerClient
+namespace StlExplorerClient.Platforms.iOS
 {
     [Register("AppDelegate")]
     public class AppDelegate : MauiUIApplicationDelegate

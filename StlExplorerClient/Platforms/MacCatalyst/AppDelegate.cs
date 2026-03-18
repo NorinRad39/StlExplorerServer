@@ -1,6 +1,6 @@
 ﻿using Foundation;
 
-namespace StlExplorerClient
+namespace StlExplorerClient.Platforms.MacCatalyst
 {
     [Register("AppDelegate")]
     public class AppDelegate : MauiUIApplicationDelegate

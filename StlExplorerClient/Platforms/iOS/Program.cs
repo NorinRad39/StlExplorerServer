@@ -1,7 +1,7 @@
 ﻿using ObjCRuntime;
 using UIKit;
 
-namespace StlExplorerClient
+namespace StlExplorerClient.Platforms.iOS
 {
     public class Program
     {

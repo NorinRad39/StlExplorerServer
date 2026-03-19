@@ -6,6 +6,7 @@
     <Nullable>enable</Nullable>
     <UseMaui>true</UseMaui>
     <SingleProject>true</SingleProject>
+	  <SkipValidateMauiImplicitPackageReferences>true</SkipValidateMauiImplicitPackageReferences>
   </PropertyGroup>
 
 </Project>

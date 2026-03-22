@@ -2,23 +2,80 @@
 {
     public partial class MainPage : ContentPage
     {
-        int count = 0;
-
         public MainPage()
         {
             InitializeComponent();
         }
 
-        private void OnCounterClicked(object? sender, EventArgs e)
+        // ============================================
+        // Logique pour le champ "Famille"
+        // ============================================
+        private void OnFamilleTextChanged(object sender, TextChangedEventArgs e)
         {
-            count++;
+            // TODO : Filtrer la liste 'FamilleCollectionView.ItemsSource' en fonction de e.NewTextValue
+            FamilleListContainer.IsVisible = !string.IsNullOrWhiteSpace(e.NewTextValue);
+        }
 
-            if (count == 1)
-                CounterBtn.Text = $"Clicked {count} time";
-            else
-                CounterBtn.Text = $"Clicked {count} times";
+        private void OnFamilleDropdownClicked(object sender, EventArgs e)
+        {
+            // Basculer l'affichage de la liste complète
+            FamilleListContainer.IsVisible = !FamilleListContainer.IsVisible;
+        }
 
-            SemanticScreenReader.Announce(CounterBtn.Text);
+        private void OnFamilleSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.CurrentSelection.FirstOrDefault() is string selection)
+            {
+                FamilleEntry.Text = selection;
+                FamilleListContainer.IsVisible = false;
+                FamilleCollectionView.SelectedItem = null; // Réinitialise la sélection
+            }
+        }
+
+        // ============================================
+        // Logique pour le champ "Sujet"
+        // ============================================
+        private void OnSujetTextChanged(object sender, TextChangedEventArgs e)
+        {
+            SujetListContainer.IsVisible = !string.IsNullOrWhiteSpace(e.NewTextValue);
+        }
+
+        private void OnSujetDropdownClicked(object sender, EventArgs e)
+        {
+            SujetListContainer.IsVisible = !SujetListContainer.IsVisible;
+        }
+
+        private void OnSujetSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.CurrentSelection.FirstOrDefault() is string selection)
+            {
+                SujetEntry.Text = selection;
+                SujetListContainer.IsVisible = false;
+                SujetCollectionView.SelectedItem = null;
+            }
+        }
+
+        // ============================================
+        // Logique pour le champ "Modèle"
+        // ============================================
+        private void OnModeleTextChanged(object sender, TextChangedEventArgs e)
+        {
+            ModeleListContainer.IsVisible = !string.IsNullOrWhiteSpace(e.NewTextValue);
+        }
+
+        private void OnModeleDropdownClicked(object sender, EventArgs e)
+        {
+            ModeleListContainer.IsVisible = !ModeleListContainer.IsVisible;
+        }
+
+        private void OnModeleSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.CurrentSelection.FirstOrDefault() is string selection)
+            {
+                ModeleEntry.Text = selection;
+                ModeleListContainer.IsVisible = false;
+                ModeleCollectionView.SelectedItem = null;
+            }
         }
     }
 }

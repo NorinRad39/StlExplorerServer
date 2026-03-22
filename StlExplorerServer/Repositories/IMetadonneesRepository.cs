@@ -5,7 +5,7 @@ namespace StlExplorerServer.Repositories
     /// <summary>
     /// Interface pour le référentiel de métadonnées.
     /// </summary>
-    public interface IMetadataRepository
+    public interface IMetadonneesRepository
     {
         /// <summary>
         /// Récupère un modèle par son chemin de dossier physique.
@@ -15,10 +15,21 @@ namespace StlExplorerServer.Repositories
         Modele? GetModeleByChemin(string chemin);
 
         /// <summary>
+        /// Récupère tous les modèles enregistrés dans la base de données.
+        /// </summary>
+        /// <returns>La liste de tous les modèles.</returns>
+        IEnumerable<Modele> GetAllModeles();
+
+        /// <summary>
         /// Enregistre les métadonnées d'un modèle.
         /// </summary>
         /// <param name="modele">Le modèle de métadonnées à enregistrer.</param>
         void SaveModele(Modele modele);
+
+        /// <summary>
+        /// Met à jour un modèle existant.
+        /// </summary>
+        void UpdateModele(Modele modele);
 
         /// <summary>
         /// Récupère un sujet par son nom.
@@ -47,6 +58,8 @@ namespace StlExplorerServer.Repositories
         void SaveFamille(Famille famille);
     }
 }
+
+
 
 
 

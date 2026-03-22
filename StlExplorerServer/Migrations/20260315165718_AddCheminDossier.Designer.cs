@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using StlExplorerServer.Data;
 
@@ -10,9 +11,11 @@ using StlExplorerServer.Data;
 namespace StlExplorerServer.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260315165718_AddCheminDossier")]
+    partial class AddCheminDossier
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -46,10 +49,6 @@ namespace StlExplorerServer.Migrations
                     MySqlPropertyBuilderExtensions.UseMySqlIdentityColumn(b.Property<int>("ModeleID"));
 
                     b.Property<string>("CheminDossier")
-                        .HasColumnType("longtext");
-
-                    b.Property<string>("CheminsImages")
-                        .IsRequired()
                         .HasColumnType("longtext");
 
                     b.Property<string>("Description")

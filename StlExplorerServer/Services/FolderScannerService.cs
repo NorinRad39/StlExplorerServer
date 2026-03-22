@@ -18,7 +18,7 @@ namespace StlExplorerServer.Services
     /// Ce service parcourt une arborescence de fichiers sur le disque dur et mappe cette arborescence
     /// vers nos objets métiers métier <see cref="Famille"/>, <see cref="Sujet"/> et <see cref="Modele"/>.
     /// </remarks>
-    public class FolderScannerService(IMetadataRepository metadataRepository, ILogger<FolderScannerService> logger, IConfiguration configuration) : IFolderScannerService
+    public class FolderScannerService(IMetadonneesRepository metadataRepository, ILogger<FolderScannerService> logger, IConfiguration configuration) : IFolderScannerService
     {
         #region Méthodes Publiques
 
@@ -203,10 +203,19 @@ namespace StlExplorerServer.Services
         /// <returns>Un objet Modele (nouveau ou existant).</returns>
         private Modele GetOrCreateModele(DirectoryInfo directory)
         {
+            // Chercher les images dans le dossier (Niveau 3) et ses sous-dossiers
+            var imageFiles = directory.GetFiles("*.*", SearchOption.AllDirectories)
+                .Where(file => file.Extension.ToLower() is ".jpg" or ".jpeg" or ".png" or ".webp")
+                .Select(file => file.FullName)
+                .ToList();
+
             // Évite la création en double si le scan est relancé
             var existingModele = metadataRepository.GetModeleByChemin(directory.FullName);
             if (existingModele != null)
             {
+                // Mise à jour des images au cas où de nouvelles ont été ajoutées
+                existingModele.CheminsImages = imageFiles;
+                metadataRepository.UpdateModele(existingModele);
                 return existingModele;
             }
 
@@ -215,6 +224,7 @@ namespace StlExplorerServer.Services
             {
                 Description = directory.Name,
                 CheminDossier = directory.FullName, // Renseignement du chemin physique (Très important !)
+                CheminsImages = imageFiles, // Ajout des chemins d'images trouvés
                 Sujet = GetOrCreateSujet(directory.Parent)
             };
 

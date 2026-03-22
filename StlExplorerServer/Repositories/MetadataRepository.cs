@@ -5,7 +5,7 @@ using System.Linq;
 namespace StlExplorerServer.Repositories
 {
     // ... Les commentaires ont été réduits pour plus de lisibilité ...
-    public class MetadataRepository(ApplicationDbContext context) : IMetadataRepository
+    public class MetadataRepository(ApplicationDbContext context) : IMetadonneesRepository
     {
         #region Méthodes pour Modele
 
@@ -20,11 +20,25 @@ namespace StlExplorerServer.Repositories
         }
 
         /// <summary>
+        /// Récupère tous les modèles enregistrés dans la base de données.
+        /// </summary>
+        public System.Collections.Generic.IEnumerable<Modele> GetAllModeles()
+        {
+            return context.Modeles.ToList();
+        }
+
+        /// <summary>
         /// Enregistre un nouveau <see cref="Modele"/> (et ses relations, si elles existent) dans la base de données.
         /// </summary>
         public void SaveModele(Modele modele)
         {
             context.Modeles.Add(modele);
+            context.SaveChanges();
+        }
+
+        public void UpdateModele(Modele modele)
+        {
+            context.Modeles.Update(modele);
             context.SaveChanges();
         }
 

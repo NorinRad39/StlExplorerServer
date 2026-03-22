@@ -39,7 +39,7 @@ builder.Services.AddControllers();
 /// Cela permet une meilleure flexibilité et d'écrire des tests informatiques plus facilement.
 /// </remarks>
 builder.Services.AddScoped<IFolderScannerService, FolderScannerService>();
-builder.Services.AddScoped<IMetadataRepository, MetadataRepository>();
+builder.Services.AddScoped<IMetadonneesRepository, MetadataRepository>();
 
 #endregion
 

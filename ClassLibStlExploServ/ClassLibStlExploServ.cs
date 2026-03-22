@@ -1,4 +1,4 @@
-﻿namespace ClassLibStlExploServ
+namespace ClassLibStlExploServ
 {
     #region Classe Modele
 
@@ -40,6 +40,12 @@
         /// Utile pour retrouver facilement les fichiers physiques sur le disque.
         /// </summary>
         public string? CheminDossier { get; set; }
+
+        /// <summary>
+        /// Liste des chemins vers les images (ex: jpg, png) trouvées dans le dossier du modèle.
+        /// Utile pour afficher une galerie ou une image de couverture dans l'interface utilisateur.
+        /// </summary>
+        public List<string> CheminsImages { get; set; } = [];
 
         #endregion
 

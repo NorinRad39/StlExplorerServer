@@ -25,52 +25,51 @@ namespace StlExplorerServer.Controllers
         #region Points de Terminaison (Endpoints)
 
         /// <summary>
-        /// Déclenche le scan d'un répertoire spécifique sur le serveur afin de peupler la base de données.
+        /// Déclenche le scan de tous les dossiers racines définis dans le fichier de configuration appsettings.json.
         /// </summary>
-        /// <param name="path">
-        /// Le chemin (chemin d'accès absolu ou relatif) du dossier à scanner.
-        /// L'attribut <c>[FromBody]</c> indique que la valeur de cette chaîne doit être extraite du corps de la requête HTTP.
-        /// </param>
         /// <returns>
-        /// Un objet <see cref="IActionResult"/> qui représente le résultat de la requête Http :
-        /// <c>Status 200 (OK)</c> en cas de succès, ou <c>Status 500 (Internal Server Error)</c> en cas de plantage.
+        /// Un objet <see cref="IActionResult"/> représentant le résultat de l'opération.
         /// </returns>
-        /// <remarks>
-        /// On utilise ici <c>[HttpPost]</c> (et non HttpGet) car le scan est une action qui va potentiellement 
-        /// modifier l'état du serveur en créant de nouvelles entrées dans la base de données de métadonnées.
-        /// L'URL finale de cette méthode sera : <c>POST http://votre-serveur/api/Metadata/scan</c>
-        /// </remarks>
-        /// <example>
-        /// Exemple de requête HTTP côté client (en JavaScript) :
-        /// <code>
-        /// fetch('api/Metadata/scan', {
-        ///     method: 'POST',
-        ///     headers: {
-        ///         'Content-Type': 'application/json'
-        ///     },
-        ///     body: JSON.stringify("C:\\MesDossiers\\Pieces3D")
-        /// });
-        /// </code>
-        /// </example>
-        [HttpPost("scan")]
-        public IActionResult ScanFolder([FromBody] string path)
+        [HttpPost("scanAll")]
+        public IActionResult ScanAllConfiguredFolders([FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
-            logger.LogInformation("Requête reçue pour scanner le dossier : {Path}", path);
+            logger.LogInformation("Requête reçue pour scanner tous les dossiers configurés.");
 
             try
             {
-                folderScannerService.ScanFolder(path);
+                var roots = configuration.GetSection("ScannerSettings:RootDirectories").Get<string[]>();
 
-                logger.LogInformation("Dossier scanné avec succès.");
-                
-                return Ok("Folder scanned successfully.");
+                if (roots == null || roots.Length == 0)
+                {
+                    logger.LogWarning("Aucun dossier racine configuré dans appsettings.json.");
+                    return BadRequest("No root directories configured.");
+                }
+
+                foreach (var path in roots)
+                {
+                    logger.LogInformation("Début du scan pour le dossier configuré : {Path}", path);
+                    folderScannerService.ScanFolder(path);
+                }
+
+                logger.LogInformation("Tous les dossiers configurés ont été scannés avec succès.");
+                return Ok("All configured folders scanned successfully.");
             }
             catch (Exception ex)
             {
-                logger.LogError(ex, "Erreur interne du serveur lors du scan du dossier : {Path}", path);
-                
+                logger.LogError(ex, "Erreur interne du serveur lors du scan des dossiers configurés.");
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Récupère la liste de tous les modèles avec leurs chemins d'images.
+        /// </summary>
+        /// <returns>La liste des modèles.</returns>
+        [HttpGet("modeles")]
+        public IActionResult GetAllModeles([FromServices] StlExplorerServer.Repositories.IMetadonneesRepository repository)
+        {
+            var modeles = repository.GetAllModeles();
+            return Ok(modeles);
         }
 
         #endregion

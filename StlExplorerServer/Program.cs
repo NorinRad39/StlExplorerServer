@@ -27,7 +27,12 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 // Demande au framework de rechercher tous les "Controllers" dans le projet pour les activer.
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.ReferenceHandler = 
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
+    });
 
 /// <summary>
 /// Enregistrement de nos propres services métiers avec la méthode AddScoped.
@@ -56,7 +61,7 @@ builder.Services.AddScoped<IMetadonneesRepository, MetadataRepository>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
+        new MariaDbServerVersion(new Version(10, 11, 0)) // Contournement de l'erreur AutoDetect avec Pomelo et .NET
     ));
 
 #endregion

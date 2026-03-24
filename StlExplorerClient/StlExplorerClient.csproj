@@ -74,4 +74,10 @@
 	  <ProjectReference Include="..\ClassLibStlExploServ\ClassLibStlExploServ.csproj" />
 	</ItemGroup>
 
+	<ItemGroup>
+	  <MauiXaml Update="ConfigPage.xaml">
+	    <Generator>MSBuild:Compile</Generator>
+	  </MauiXaml>
+	</ItemGroup>
+
 </Project>

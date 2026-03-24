@@ -1,126 +1,183 @@
 ﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              x:Class="StlExplorerClient.MainPage"
-             BackgroundColor="White"> <!-- Ajoutez cette ligne -->
+             Title="Catalogue"
+             BackgroundColor="#1E1E1E">
 
-    <ScrollView>
-        <VerticalStackLayout
-            Padding="30,30"
-            Spacing="20">
+    <ContentPage.ToolbarItems>
+        <ToolbarItem Text="⚙ Config" Clicked="OnConfigClicked" />
+    </ContentPage.ToolbarItems>
 
-            <!-- Formulaire hiérarchique avec ComboBox simulées (Entry + Liste) -->
-            <!-- Note : MAUI n'ayant pas de ComboBox natif, on combine un Entry, un Bouton et une Liste -->
-            <Grid RowSpacing="5" ColumnSpacing="15" HorizontalOptions="Start">
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="60" />
-                    <ColumnDefinition Width="220" />
-                </Grid.ColumnDefinitions>
+    <Grid>
+        <!-- Contenu principal -->
+        <ScrollView>
+            <VerticalStackLayout
+                Padding="30"
+                Spacing="20">
 
-                <!-- Ligne Famille -->
-                <Label Grid.Row="0" Grid.Column="0" Text="Famille" VerticalOptions="Center" />
-                <Border Grid.Row="0" Grid.Column="1" Stroke="#A2A2A2" StrokeThickness="1" HeightRequest="40" BackgroundColor="Transparent" Padding="0">
-                    <Grid ColumnDefinitions="*, 35">
-                        <Entry x:Name="FamilleEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextChanged="OnFamilleTextChanged" BackgroundColor="Transparent" />
-                        <Button Grid.Column="1" Text="&#x25BC;" FontSize="12" TextColor="Black" BackgroundColor="Transparent" Padding="0" Clicked="OnFamilleDropdownClicked" />
-                    </Grid>
-                </Border>
-                <!-- Popup de suggestion Famille -->
-                <Border x:Name="FamilleListContainer" Grid.Row="1" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#A2A2A2" StrokeThickness="1">
-                    <CollectionView x:Name="FamilleCollectionView" SelectionMode="Single" SelectionChanged="OnFamilleSelectionChanged">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate>
-                                <Label Text="{Binding .}" Padding="10,8" />
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </Border>
+                <!-- Formulaire hiérarchique avec ComboBox simulées -->
+                <Grid RowSpacing="5" ColumnSpacing="15" HorizontalOptions="Start">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80" />
+                        <ColumnDefinition Width="350" />
+                    </Grid.ColumnDefinitions>
 
-                <!-- Ligne Sujet -->
-                <Label Grid.Row="2" Grid.Column="0" Text="Sujet" VerticalOptions="Center" />
-                <Border Grid.Row="2" Grid.Column="1" Stroke="#A2A2A2" StrokeThickness="1" HeightRequest="40" BackgroundColor="Transparent" Padding="0">
-                    <Grid ColumnDefinitions="*, 35">
-                        <Entry x:Name="SujetEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextChanged="OnSujetTextChanged" BackgroundColor="Transparent" />
-                        <Button Grid.Column="1" Text="&#x25BC;" FontSize="12" TextColor="Black" BackgroundColor="Transparent" Padding="0" Clicked="OnSujetDropdownClicked" />
-                    </Grid>
-                </Border>
-                <!-- Popup de suggestion Sujet -->
-                <Border x:Name="SujetListContainer" Grid.Row="3" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#A2A2A2" StrokeThickness="1">
-                    <CollectionView x:Name="SujetCollectionView" SelectionMode="Single" SelectionChanged="OnSujetSelectionChanged">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate>
-                                <Label Text="{Binding .}" Padding="10,8" />
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </Border>
+                    <!-- Ligne Famille -->
+                    <Label Grid.Row="0" Grid.Column="0" Text="Famille" VerticalOptions="Center" TextColor="#E0E0E0" />
+                    <Border Grid.Row="0" Grid.Column="1" Stroke="#555" StrokeThickness="1" HeightRequest="40" BackgroundColor="#383838" Padding="0">
+                        <Grid ColumnDefinitions="*, 30, 35">
+                            <Entry x:Name="FamilleEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextColor="#E0E0E0" PlaceholderColor="#888" TextChanged="OnFamilleTextChanged" BackgroundColor="Transparent" />
+                            <Button Grid.Column="1" Text="✕" FontSize="11" TextColor="#888" BackgroundColor="Transparent" Padding="0" Clicked="OnFamilleClearClicked" />
+                            <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" TextColor="#E0E0E0" BackgroundColor="Transparent" Padding="0" Clicked="OnFamilleDropdownClicked" />
+                        </Grid>
+                    </Border>
+                    <Border x:Name="FamilleListContainer" Grid.Row="1" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D">
+                        <CollectionView x:Name="FamilleCollectionView" SelectionMode="Single" SelectionChanged="OnFamilleSelectionChanged">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Label Text="{Binding .}" Padding="10,8" TextColor="#E0E0E0" />
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Border>
 
-                <!-- Ligne Modèle -->
-                <Label Grid.Row="4" Grid.Column="0" Text="Modèle" VerticalOptions="Center" />
-                <Border Grid.Row="4" Grid.Column="1" Stroke="#A2A2A2" StrokeThickness="1" HeightRequest="40" BackgroundColor="Transparent" Padding="0">
-                    <Grid ColumnDefinitions="*, 35">
-                        <Entry x:Name="ModeleEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextChanged="OnModeleTextChanged" BackgroundColor="Transparent" />
-                        <Button Grid.Column="1" Text="&#x25BC;" FontSize="12" TextColor="Black" BackgroundColor="Transparent" Padding="0" Clicked="OnModeleDropdownClicked" />
-                    </Grid>
-                </Border>
-                <!-- Popup de suggestion Modèle -->
-                <Border x:Name="ModeleListContainer" Grid.Row="5" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#A2A2A2" StrokeThickness="1">
-                    <CollectionView x:Name="ModeleCollectionView" SelectionMode="Single" SelectionChanged="OnModeleSelectionChanged">
-                        <CollectionView.ItemTemplate>
-                            <DataTemplate>
-                                <Label Text="{Binding .}" Padding="10,8" />
-                            </DataTemplate>
-                        </CollectionView.ItemTemplate>
-                    </CollectionView>
-                </Border>
-            </Grid>
+                    <!-- Ligne Sujet -->
+                    <Label Grid.Row="2" Grid.Column="0" Text="Sujet" VerticalOptions="Center" TextColor="#E0E0E0" />
+                    <Border Grid.Row="2" Grid.Column="1" Stroke="#555" StrokeThickness="1" HeightRequest="40" BackgroundColor="#383838" Padding="0">
+                        <Grid ColumnDefinitions="*, 30, 35">
+                            <Entry x:Name="SujetEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextColor="#E0E0E0" PlaceholderColor="#888" TextChanged="OnSujetTextChanged" BackgroundColor="Transparent" />
+                            <Button Grid.Column="1" Text="✕" FontSize="11" TextColor="#888" BackgroundColor="Transparent" Padding="0" Clicked="OnSujetClearClicked" />
+                            <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" TextColor="#E0E0E0" BackgroundColor="Transparent" Padding="0" Clicked="OnSujetDropdownClicked" />
+                        </Grid>
+                    </Border>
+                    <Border x:Name="SujetListContainer" Grid.Row="3" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D">
+                        <CollectionView x:Name="SujetCollectionView" SelectionMode="Single" SelectionChanged="OnSujetSelectionChanged">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Label Text="{Binding .}" Padding="10,8" TextColor="#E0E0E0" />
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Border>
 
-            <!-- Zone Image de prévisualisation -->
-            <Border Stroke="#333" 
-                    StrokeThickness="1" 
-                    HeightRequest="400" 
-                    HorizontalOptions="Fill" 
-                    Margin="0,15,0,0">
-                <Grid>
-                    <!-- Texte en haut à gauche comme sur le croquis -->
-                    <Label Text="Image" 
-                           Margin="10" 
-                           HorizontalOptions="Start" 
-                           VerticalOptions="Start" />
-
-                    <Image x:Name="ModeleImage" Aspect="AspectFit" Margin="5" />
+                    <!-- Ligne Modèle -->
+                    <Label Grid.Row="4" Grid.Column="0" Text="Modèle" VerticalOptions="Center" TextColor="#E0E0E0" />
+                    <Border Grid.Row="4" Grid.Column="1" Stroke="#555" StrokeThickness="1" HeightRequest="40" BackgroundColor="#383838" Padding="0">
+                        <Grid ColumnDefinitions="*, 30, 35">
+                            <Entry x:Name="ModeleEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextColor="#E0E0E0" PlaceholderColor="#888" TextChanged="OnModeleTextChanged" BackgroundColor="Transparent" />
+                            <Button Grid.Column="1" Text="✕" FontSize="11" TextColor="#888" BackgroundColor="Transparent" Padding="0" Clicked="OnModeleClearClicked" />
+                            <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" TextColor="#E0E0E0" BackgroundColor="Transparent" Padding="0" Clicked="OnModeleDropdownClicked" />
+                        </Grid>
+                    </Border>
+                    <Border x:Name="ModeleListContainer" Grid.Row="5" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D">
+                        <CollectionView x:Name="ModeleCollectionView" SelectionMode="Single" SelectionChanged="OnModeleSelectionChanged">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Label Text="{Binding .}" Padding="10,8" TextColor="#E0E0E0" />
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Border>
                 </Grid>
-            </Border>
 
-            <!-- Boutons de navigation des images -->
-            <HorizontalStackLayout HorizontalOptions="Center" Spacing="40" Margin="0,10,0,0">
-                <Button x:Name="BtnImagePrecedente" 
-                        Text="&#x25C0;" 
-                        FontSize="24" 
-                        WidthRequest="100" 
-                        HeightRequest="45" 
-                        BackgroundColor="#166286"
-                        CornerRadius="5"
-                        ToolTipProperties.Text="Image précédente" />
+                <!-- Zone d'actions (Windows uniquement) -->
+                <HorizontalStackLayout x:Name="WindowsActionsPanel" IsVisible="False" Spacing="15" HorizontalOptions="Start">
+                    <Button x:Name="BtnCreerDossier" 
+                            Text="📁 Créer le dossier" 
+                            BackgroundColor="#2E7D32"
+                            TextColor="White"
+                            FontSize="14"
+                            CornerRadius="5"
+                            HeightRequest="40"
+                            Padding="15,0"
+                            IsVisible="False"
+                            Clicked="OnCreerDossierClicked" />
+                    <Button x:Name="BtnAjouterFichiers" 
+                            Text="📎 Ajouter des fichiers" 
+                            BackgroundColor="#1565C0"
+                            TextColor="White"
+                            FontSize="14"
+                            CornerRadius="5"
+                            HeightRequest="40"
+                            Padding="15,0"
+                            IsVisible="False"
+                            Clicked="OnAjouterFichiersClicked" />
+                </HorizontalStackLayout>
 
-                <Button x:Name="BtnImageSuivante" 
-                        Text="&#x25B6;" 
-                        FontSize="24" 
-                        WidthRequest="100" 
-                        HeightRequest="45" 
-                        BackgroundColor="#166286"
-                        CornerRadius="5"
-                        ToolTipProperties.Text="Image suivante" />
-            </HorizontalStackLayout>
+                <!-- Zone Image de prévisualisation (clic pour agrandir) -->
+                <Border Stroke="#555" 
+                        StrokeThickness="1" 
+                        HeightRequest="400" 
+                        HorizontalOptions="Fill" 
+                        Margin="0,15,0,0"
+                        BackgroundColor="#2D2D2D">
+                    <Grid>
+                        <Image x:Name="ModeleImage" Aspect="AspectFit" Margin="5">
+                            <Image.GestureRecognizers>
+                                <TapGestureRecognizer Tapped="OnImageTapped" />
+                            </Image.GestureRecognizers>
+                        </Image>
+                    </Grid>
+                </Border>
 
-        </VerticalStackLayout>
-    </ScrollView>
+                <!-- Boutons de navigation des images -->
+                <HorizontalStackLayout HorizontalOptions="Center" Spacing="20" Margin="0,10,0,0">
+                    <Button x:Name="BtnImagePrecedente" 
+                            Text="&#x25C0;" 
+                            FontSize="24" 
+                            WidthRequest="100" 
+                            HeightRequest="45" 
+                            BackgroundColor="#166286"
+                            TextColor="White"
+                            CornerRadius="5"
+                            ToolTipProperties.Text="Image précédente"
+                            Clicked="OnImagePrecedenteClicked" />
+
+                    <Label x:Name="ImageCounterLabel" 
+                           Text="" 
+                           TextColor="#E0E0E0" 
+                           FontSize="16" 
+                           VerticalOptions="Center" 
+                           HorizontalOptions="Center"
+                           WidthRequest="80"
+                           HorizontalTextAlignment="Center" />
+
+                    <Button x:Name="BtnImageSuivante" 
+                            Text="&#x25B6;" 
+                            FontSize="24" 
+                            WidthRequest="100" 
+                            HeightRequest="45" 
+                            BackgroundColor="#166286"
+                            TextColor="White"
+                            CornerRadius="5"
+                            ToolTipProperties.Text="Image suivante"
+                            Clicked="OnImageSuivanteClicked" />
+                </HorizontalStackLayout>
+
+            </VerticalStackLayout>
+        </ScrollView>
+
+        <!-- Overlay plein écran pour agrandir l'image (clic pour fermer) -->
+        <Grid x:Name="ImageOverlay" IsVisible="False" BackgroundColor="#DD000000" ZIndex="100">
+            <Grid.GestureRecognizers>
+                <TapGestureRecognizer Tapped="OnImageOverlayTapped" />
+            </Grid.GestureRecognizers>
+            <Image x:Name="EnlargedImage" Aspect="AspectFit" Margin="30" />
+            <Label Text="Cliquer pour fermer" 
+                   TextColor="#AAA" 
+                   FontSize="13" 
+                   HorizontalOptions="Center" 
+                   VerticalOptions="End" 
+                   Margin="0,0,0,15" />
+        </Grid>
+    </Grid>
 
 </ContentPage>

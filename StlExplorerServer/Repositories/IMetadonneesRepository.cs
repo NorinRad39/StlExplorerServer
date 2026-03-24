@@ -56,6 +56,27 @@ namespace StlExplorerServer.Repositories
         /// </summary>
         /// <param name="famille">La famille à enregistrer.</param>
         void SaveFamille(Famille famille);
+
+        /// <summary>
+        /// Récupère un modèle par son identifiant unique (avec Sujet et Famille).
+        /// </summary>
+        Modele? GetModeleById(int id);
+
+        /// <summary>
+        /// Récupère un sujet par son nom au sein d'une famille spécifique.
+        /// </summary>
+        Sujet? GetSujetByNameAndFamilleId(string name, int familleId);
+
+        /// <summary>
+        /// Récupère un résumé léger de tous les modèles (sans chemins d'images) de manière asynchrone.
+        /// Utilise une projection SQL pour ne charger que les colonnes nécessaires.
+        /// </summary>
+        Task<List<ModeleResume>> GetAllModelesResumeAsync();
+
+        /// <summary>
+        /// Récupère les chemins des images d'un modèle spécifique de manière asynchrone.
+        /// </summary>
+        Task<List<string>> GetImagesForModeleAsync(int modeleId);
     }
 }
 

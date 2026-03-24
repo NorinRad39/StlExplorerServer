@@ -180,4 +180,42 @@ namespace ClassLibStlExploServ
     }
 
     #endregion
+
+    #region Classe CreerModeleRequete
+
+    /// <summary>
+    /// DTO (Data Transfer Object) pour la requête de création d'un nouveau modèle.
+    /// Contient les noms des 3 niveaux de la hiérarchie (Famille > Sujet > Modèle).
+    /// </summary>
+    public class CreerModeleRequete
+    {
+        /// <summary>Nom de la famille (niveau 1).</summary>
+        public string NomFamille { get; set; } = "";
+
+        /// <summary>Nom du sujet (niveau 2).</summary>
+        public string NomSujet { get; set; } = "";
+
+        /// <summary>Nom du modèle (niveau 3).</summary>
+        public string NomModele { get; set; } = "";
+    }
+
+    #endregion
+
+    #region Classe ModeleResume
+
+    /// <summary>
+    /// DTO léger pour le chargement rapide des listes déroulantes.
+    /// Contient uniquement les noms et identifiants, sans les chemins d'images.
+    /// </summary>
+    public class ModeleResume
+    {
+        public int ModeleID { get; set; }
+        public string? Description { get; set; }
+        public string? NomSujet { get; set; }
+        public int SujetID { get; set; }
+        public string? NomFamille { get; set; }
+        public int FamilleID { get; set; }
+    }
+
+    #endregion
 }

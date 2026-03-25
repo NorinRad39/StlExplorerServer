@@ -105,6 +105,9 @@ if (app.Environment.IsDevelopment())
 // Commenté ici si le HTTPS (certificat SSL) n'est pas configuré sur votre environnement de test local.
 //app.UseHttpsRedirection();
 
+// Sert les fichiers statiques depuis le dossier wwwroot (ex: viewer3d.html pour la prévisualisation 3D)
+app.UseStaticFiles();
+
 // Demande à l'application d'analyser l'URL entrante pour l'envoyer au bon contrôleur (ex: /api/Metadata)
 app.MapControllers();
 

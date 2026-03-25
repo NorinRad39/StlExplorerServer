@@ -66,6 +66,7 @@ namespace StlExplorerServer.Repositories
                 {
                     ModeleID = m.ModeleID,
                     Description = m.Description,
+                    CheminDossier = m.CheminDossier,
                     SujetID = m.SujetID,
                     NomSujet = m.Sujet != null ? m.Sujet.NomSujet : null,
                     FamilleID = m.Sujet != null ? m.Sujet.FamilleID : 0,

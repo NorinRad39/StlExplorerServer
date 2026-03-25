@@ -89,7 +89,7 @@
                 </Grid>
 
                 <!-- Zone d'actions (Windows uniquement) -->
-                <HorizontalStackLayout x:Name="WindowsActionsPanel" IsVisible="False" Spacing="15" HorizontalOptions="Start">
+                <HorizontalStackLayout x:Name="WindowsActionsPanel" IsVisible="False" Spacing="10" HorizontalOptions="Start">
                     <Button x:Name="BtnCreerDossier" 
                             Text="📁 Créer le dossier" 
                             BackgroundColor="#2E7D32"
@@ -110,12 +110,60 @@
                             Padding="15,0"
                             IsVisible="False"
                             Clicked="OnAjouterFichiersClicked" />
+                    <Button x:Name="BtnRenommerModele" 
+                            Text="✏ Renommer" 
+                            BackgroundColor="#F57F17"
+                            TextColor="White"
+                            FontSize="14"
+                            CornerRadius="5"
+                            HeightRequest="40"
+                            Padding="15,0"
+                            IsVisible="False"
+                            Clicked="OnRenommerModeleClicked" />
+                    <Button x:Name="BtnOuvrirExplorateur" 
+                            Text="📂 Ouvrir le dossier" 
+                            BackgroundColor="#6A1B9A"
+                            TextColor="White"
+                            FontSize="14"
+                            CornerRadius="5"
+                            HeightRequest="40"
+                            Padding="15,0"
+                            IsVisible="False"
+                            Clicked="OnOuvrirExplorateurClicked" />
                 </HorizontalStackLayout>
 
-                <!-- Zone Image de prévisualisation (clic pour agrandir) -->
+                <!-- Contenu du dossier (fichiers et sous-dossiers à la racine) -->
+                <Border x:Name="ContenuDossierPanel" IsVisible="False" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D" Padding="10">
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="📂 Contenu du dossier" FontSize="14" FontAttributes="Bold" TextColor="#E0E0E0" />
+                        <CollectionView x:Name="ContenuDossierCollectionView" HeightRequest="100">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Label Text="{Binding .}" Padding="5,3" TextColor="#CCC" FontSize="13" />
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Fichiers 3D détectés (cliquables pour aperçu) -->
+                <Border x:Name="Fichiers3DPanel" IsVisible="False" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D" Padding="10">
+                    <VerticalStackLayout Spacing="5">
+                        <Label Text="🧊 Fichiers 3D" FontSize="14" FontAttributes="Bold" TextColor="#E0E0E0" />
+                        <CollectionView x:Name="Fichiers3DCollectionView" HeightRequest="120" SelectionMode="Single" SelectionChanged="OnFichier3DSelectionChanged">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Label Text="{Binding Affichage}" Padding="5,3" TextColor="#4FC3F7" FontSize="13" TextDecorations="Underline" />
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Zone de prévisualisation (image ou viewer 3D) -->
                 <Border Stroke="#555" 
                         StrokeThickness="1" 
-                        HeightRequest="400" 
+                        HeightRequest="450" 
                         HorizontalOptions="Fill" 
                         Margin="0,15,0,0"
                         BackgroundColor="#2D2D2D">
@@ -125,11 +173,25 @@
                                 <TapGestureRecognizer Tapped="OnImageTapped" />
                             </Image.GestureRecognizers>
                         </Image>
+                        <WebView x:Name="Viewer3DWebView" IsVisible="False" />
                     </Grid>
                 </Border>
 
+                <!-- Bouton retour aux images (visible quand le viewer 3D est actif) -->
+                <Button x:Name="BtnRetourImages" 
+                        Text="🖼 Retour aux images" 
+                        BackgroundColor="#555" 
+                        TextColor="White" 
+                        FontSize="14" 
+                        CornerRadius="5" 
+                        HeightRequest="40" 
+                        Padding="15,0" 
+                        HorizontalOptions="Center"
+                        IsVisible="False" 
+                        Clicked="OnRetourImagesClicked" />
+
                 <!-- Boutons de navigation des images -->
-                <HorizontalStackLayout HorizontalOptions="Center" Spacing="20" Margin="0,10,0,0">
+                <HorizontalStackLayout x:Name="ImageNavPanel" HorizontalOptions="Center" Spacing="20" Margin="0,10,0,0">
                     <Button x:Name="BtnImagePrecedente" 
                             Text="&#x25C0;" 
                             FontSize="24" 

@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body { margin: 0; overflow: hidden; background: #2D2D2D; }
+canvas { display: block; }
+#info { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+        color: #666; font-family: sans-serif; font-size: 12px; pointer-events: none; }
+</style>
+</head>
+<body>
+<div id="info">Clic gauche = rotation · Clic droit = panoramique · Molette = zoom</div>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
+import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2D2D2D);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 100000);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+const d1 = new THREE.DirectionalLight(0xffffff, 1.2);
+d1.position.set(1, 2, 3);
+scene.add(d1);
+const d2 = new THREE.DirectionalLight(0xffffff, 0.4);
+d2.position.set(-2, -1, -1);
+scene.add(d2);
+
+function clearMeshes() {
+  scene.children.filter(c => !c.isLight).forEach(c => scene.remove(c));
+}
+
+function centerAndFit(obj) {
+  const box = new THREE.Box3().setFromObject(obj);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  obj.position.sub(center);
+  const maxDim = Math.max(size.x, size.y, size.z);
+  camera.position.set(maxDim * 0.8, maxDim * 0.6, maxDim * 1.2);
+  controls.target.set(0, 0, 0);
+  controls.update();
+}
+
+const mat = new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.25, roughness: 0.65 });
+
+window.loadModel = function(url, extension) {
+  clearMeshes();
+  const ext = extension.toLowerCase();
+  if (ext === '.stl') {
+    new STLLoader().load(url, function(geometry) {
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, mat);
+      scene.add(mesh);
+      centerAndFit(mesh);
+    });
+  } else if (ext === '.obj') {
+    new OBJLoader().load(url, function(group) {
+      group.traverse(c => { if (c.isMesh) c.material = mat; });
+      scene.add(group);
+      centerAndFit(group);
+    });
+  }
+};
+
+(function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>

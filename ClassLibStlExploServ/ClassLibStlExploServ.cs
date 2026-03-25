@@ -215,6 +215,47 @@ namespace ClassLibStlExploServ
         public int SujetID { get; set; }
         public string? NomFamille { get; set; }
         public int FamilleID { get; set; }
+        public string? CheminDossier { get; set; }
+    }
+
+    #endregion
+
+    #region Classe ContenuModele
+
+    /// <summary>
+    /// DTO décrivant le contenu à la racine du dossier d'un modèle.
+    /// </summary>
+    public class ContenuModele
+    {
+        public List<string> Dossiers { get; set; } = [];
+        public List<string> Fichiers { get; set; } = [];
+        public List<Fichier3D> Fichiers3D { get; set; } = [];
+    }
+
+    #endregion
+
+    #region Classe Fichier3D
+
+    /// <summary>
+    /// Représente un fichier 3D détecté (directement ou dans une archive).
+    /// </summary>
+    public class Fichier3D
+    {
+        public string Nom { get; set; } = "";
+        public string? NomArchive { get; set; }
+        public string Affichage => NomArchive != null ? $"{Nom}  ← {NomArchive}" : Nom;
+    }
+
+    #endregion
+
+    #region Classe RenommerModeleRequete
+
+    /// <summary>
+    /// DTO pour la requête de renommage d'un modèle.
+    /// </summary>
+    public class RenommerModeleRequete
+    {
+        public string NouveauNom { get; set; } = "";
     }
 
     #endregion

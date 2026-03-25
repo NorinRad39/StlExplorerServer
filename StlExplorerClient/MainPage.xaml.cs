@@ -12,6 +12,8 @@ namespace StlExplorerClient
         private HttpClient? _httpClient;
         private ModeleResume? _modeleCourant;
         private bool _suppressChildClear;
+        private List<Fichier3D> _currentFichiers3D = new();
+        private bool _viewer3DVisible;
 
         public MainPage()
         {
@@ -29,14 +31,20 @@ namespace StlExplorerClient
             try 
             {
                 var handler = new HttpClientHandler();
+
+                // Lire l'URL du serveur depuis les préférences (configurable dans la page Config)
+                var defaultUrl =
+#if ANDROID
+                    "http://10.0.2.2:5182";
+#else
+                    "http://localhost:5182";
+#endif
+                var serverUrl = Preferences.Get(ConfigPage.ServerUrlKey, defaultUrl).TrimEnd('/');
+
 #if ANDROID
                 handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
-                _httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://10.0.2.2:5182") };
-#elif WINDOWS
-                _httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5182") };
-#else
-                _httpClient = new HttpClient(handler) { BaseAddress = new Uri("http://localhost:5182") };
 #endif
+                _httpClient = new HttpClient(handler) { BaseAddress = new Uri(serverUrl + "/") };
                 // Endpoint léger : projection SQL sans les CheminsImages
                 var response = await _httpClient.GetFromJsonAsync<List<ModeleResume>>("/api/Metadata/modelesResume");
                 if (response != null)
@@ -230,10 +238,12 @@ namespace StlExplorerClient
         }
 
         // ============================================
-        // Galerie d'images
+        // Galerie d'images et contenu du modèle
         // ============================================
         private async void LoadGalleryForModele(string nomModele)
         {
+            RetourAuxImages();
+
             var modele = _allModeles.FirstOrDefault(m => m.Description == nomModele);
             if (modele != null && _httpClient != null)
             {
@@ -246,16 +256,79 @@ namespace StlExplorerClient
                         _currentImages = images;
                         _currentImageIndex = 0;
                         DisplayCurrentImage();
-                        return;
+                    }
+                    else
+                    {
+                        ClearGallery();
                     }
                 }
-                catch { /* La galerie sera vidée ci-dessous */ }
+                catch { ClearGallery(); }
+
+                LoadContenuForModele(modele.ModeleID);
+                return;
             }
 
+            ClearGallery();
+            ClearContenuPanels();
+        }
+
+        private void ClearGallery()
+        {
             _currentImages.Clear();
             _currentImageIndex = -1;
             ModeleImage.Source = null;
             ImageCounterLabel.Text = "";
+        }
+
+        private async void LoadContenuForModele(int modeleId)
+        {
+            if (_httpClient == null) { ClearContenuPanels(); return; }
+
+            try
+            {
+                var contenu = await _httpClient.GetFromJsonAsync<ContenuModele>(
+                    $"/api/Metadata/modele/{modeleId}/contenu");
+                if (contenu != null)
+                {
+                    var items = new List<string>();
+                    foreach (var d in contenu.Dossiers) items.Add($"📁 {d}");
+                    foreach (var f in contenu.Fichiers) items.Add($"📄 {f}");
+
+                    if (items.Count > 0)
+                    {
+                        ContenuDossierCollectionView.ItemsSource = items;
+                        ContenuDossierPanel.IsVisible = true;
+                    }
+                    else
+                    {
+                        ContenuDossierPanel.IsVisible = false;
+                    }
+
+                    _currentFichiers3D = contenu.Fichiers3D;
+                    if (_currentFichiers3D.Count > 0)
+                    {
+                        Fichiers3DCollectionView.ItemsSource = _currentFichiers3D;
+                        Fichiers3DPanel.IsVisible = true;
+                    }
+                    else
+                    {
+                        Fichiers3DPanel.IsVisible = false;
+                    }
+                    return;
+                }
+            }
+            catch { /* Panneaux vidés ci-dessous */ }
+
+            ClearContenuPanels();
+        }
+
+        private void ClearContenuPanels()
+        {
+            ContenuDossierCollectionView.ItemsSource = null;
+            ContenuDossierPanel.IsVisible = false;
+            Fichiers3DCollectionView.ItemsSource = null;
+            Fichiers3DPanel.IsVisible = false;
+            _currentFichiers3D.Clear();
         }
 
         private void DisplayCurrentImage()
@@ -325,10 +398,12 @@ namespace StlExplorerClient
 
                 if (existant != null)
                 {
-                    // Modèle existant : proposer d'ajouter des fichiers
+                    // Modèle existant : proposer d'ajouter des fichiers, renommer, ouvrir
                     _modeleCourant = existant;
                     BtnCreerDossier.IsVisible = false;
                     BtnAjouterFichiers.IsVisible = true;
+                    BtnRenommerModele.IsVisible = true;
+                    BtnOuvrirExplorateur.IsVisible = true;
                 }
                 else
                 {
@@ -336,6 +411,8 @@ namespace StlExplorerClient
                     _modeleCourant = null;
                     BtnCreerDossier.IsVisible = true;
                     BtnAjouterFichiers.IsVisible = false;
+                    BtnRenommerModele.IsVisible = false;
+                    BtnOuvrirExplorateur.IsVisible = false;
                 }
             }
             else
@@ -343,6 +420,8 @@ namespace StlExplorerClient
                 _modeleCourant = null;
                 BtnCreerDossier.IsVisible = false;
                 BtnAjouterFichiers.IsVisible = false;
+                BtnRenommerModele.IsVisible = false;
+                BtnOuvrirExplorateur.IsVisible = false;
             }
         }
 
@@ -458,18 +537,24 @@ namespace StlExplorerClient
         {
             FamilleEntry.Text = "";
             FamilleListContainer.IsVisible = false;
+            ClearContenuPanels();
+            RetourAuxImages();
         }
 
         private void OnSujetClearClicked(object sender, EventArgs e)
         {
             SujetEntry.Text = "";
             SujetListContainer.IsVisible = false;
+            ClearContenuPanels();
+            RetourAuxImages();
         }
 
         private void OnModeleClearClicked(object sender, EventArgs e)
         {
             ModeleEntry.Text = "";
             ModeleListContainer.IsVisible = false;
+            ClearContenuPanels();
+            RetourAuxImages();
         }
 
         // ============================================
@@ -487,6 +572,142 @@ namespace StlExplorerClient
         private void OnImageOverlayTapped(object sender, TappedEventArgs e)
         {
             ImageOverlay.IsVisible = false;
+        }
+
+        // ============================================
+        // Viewer 3D (WebView + Three.js)
+        // ============================================
+        private async void OnFichier3DSelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.CurrentSelection.FirstOrDefault() is not Fichier3D fichier) return;
+            Fichiers3DCollectionView.SelectedItem = null;
+
+            if (_httpClient == null || _modeleCourant == null) return;
+
+            await ShowViewer3D(fichier);
+        }
+
+        private async Task ShowViewer3D(Fichier3D fichier)
+        {
+            if (_httpClient == null || _modeleCourant == null) return;
+
+            var ext = System.IO.Path.GetExtension(fichier.Nom).ToLowerInvariant();
+            if (ext != ".stl" && ext != ".obj")
+            {
+                await DisplayAlert("Info",
+                    $"L'aperçu 3D n'est disponible que pour les fichiers STL et OBJ.\n(Fichier : {fichier.Nom})",
+                    "OK");
+                return;
+            }
+
+            // Construire l'URL du fichier 3D
+            var encodedNom = Uri.EscapeDataString(fichier.Nom);
+            var url = $"{_httpClient.BaseAddress}api/Metadata/modele/{_modeleCourant.ModeleID}/fichier3d?nom={encodedNom}";
+            if (!string.IsNullOrEmpty(fichier.NomArchive))
+                url += $"&archive={Uri.EscapeDataString(fichier.NomArchive)}";
+
+            // Charger le viewer si pas encore fait
+            if (!_viewer3DVisible)
+            {
+                var viewerUrl = $"{_httpClient.BaseAddress}viewer3d.html";
+                var tcs = new TaskCompletionSource<bool>();
+                void OnNavigated(object? s, WebNavigatedEventArgs args)
+                {
+                    Viewer3DWebView.Navigated -= OnNavigated;
+                    tcs.TrySetResult(true);
+                }
+                Viewer3DWebView.Navigated += OnNavigated;
+                Viewer3DWebView.Source = viewerUrl;
+
+                // Attendre le chargement (timeout 10s)
+                await Task.WhenAny(tcs.Task, Task.Delay(10000));
+            }
+
+            // Basculer l'affichage
+            ModeleImage.IsVisible = false;
+            Viewer3DWebView.IsVisible = true;
+            ImageNavPanel.IsVisible = false;
+            BtnRetourImages.IsVisible = true;
+            _viewer3DVisible = true;
+
+            // Appeler le JS pour charger le modèle
+            var js = $"window.loadModel('{url.Replace("'", "\\'")}', '{ext}');";
+            await Viewer3DWebView.EvaluateJavaScriptAsync(js);
+        }
+
+        private void RetourAuxImages()
+        {
+            if (!_viewer3DVisible) return;
+            Viewer3DWebView.IsVisible = false;
+            ModeleImage.IsVisible = true;
+            ImageNavPanel.IsVisible = true;
+            BtnRetourImages.IsVisible = false;
+            _viewer3DVisible = false;
+        }
+
+        private void OnRetourImagesClicked(object sender, EventArgs e)
+        {
+            RetourAuxImages();
+        }
+
+        // ============================================
+        // Renommage du modèle (Windows)
+        // ============================================
+        private async void OnRenommerModeleClicked(object sender, EventArgs e)
+        {
+            if (_httpClient == null || _modeleCourant == null) return;
+
+            var nouveauNom = await DisplayPromptAsync(
+                "Renommer le modèle",
+                "Nouveau nom du dossier :",
+                initialValue: _modeleCourant.Description ?? "",
+                accept: "Renommer",
+                cancel: "Annuler");
+
+            if (string.IsNullOrWhiteSpace(nouveauNom)) return;
+            if (nouveauNom.Trim() == _modeleCourant.Description) return;
+
+            try
+            {
+                var requete = new RenommerModeleRequete { NouveauNom = nouveauNom.Trim() };
+                var response = await _httpClient.PutAsJsonAsync(
+                    $"/api/Metadata/renommerModele/{_modeleCourant.ModeleID}", requete);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _modeleCourant.Description = nouveauNom.Trim();
+                    _suppressChildClear = true;
+                    ModeleEntry.Text = nouveauNom.Trim();
+                    _suppressChildClear = false;
+
+                    UpdateModeles();
+                    await DisplayAlert("Succès", $"Modèle renommé en « {nouveauNom.Trim()} ».", "OK");
+                }
+                else
+                {
+                    var erreur = await response.Content.ReadAsStringAsync();
+                    await DisplayAlert("Erreur", $"Le serveur a répondu : {erreur}", "OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Erreur", "Impossible de renommer : " + ex.Message, "OK");
+            }
+        }
+
+        // ============================================
+        // Ouvrir le dossier dans l'explorateur (Windows)
+        // ============================================
+        private void OnOuvrirExplorateurClicked(object sender, EventArgs e)
+        {
+#if WINDOWS
+            if (_modeleCourant == null || string.IsNullOrWhiteSpace(_modeleCourant.CheminDossier)) return;
+            try
+            {
+                System.Diagnostics.Process.Start("explorer.exe", _modeleCourant.CheminDossier);
+            }
+            catch { /* Ignorer si l'ouverture échoue */ }
+#endif
         }
 
         // ============================================

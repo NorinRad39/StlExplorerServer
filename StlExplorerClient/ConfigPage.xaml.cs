@@ -4,6 +4,9 @@ namespace StlExplorerClient
 {
     public partial class ConfigPage : ContentPage
     {
+        public const string ServerUrlKey = "ServerUrl";
+        public const string DefaultServerUrl = "http://localhost:5182";
+
         private readonly HttpClient? _httpClient;
         private List<string> _dossiers = new();
 
@@ -11,7 +14,40 @@ namespace StlExplorerClient
         {
             InitializeComponent();
             _httpClient = httpClient;
+
+            // Charger l'URL actuelle du serveur
+            ServerUrlEntry.Text = Preferences.Get(ServerUrlKey, _httpClient?.BaseAddress?.ToString() ?? DefaultServerUrl);
+
             ChargerConfiguration();
+        }
+
+        private async void OnAppliquerUrlClicked(object sender, EventArgs e)
+        {
+            var url = ServerUrlEntry.Text?.Trim();
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                UrlStatusLabel.TextColor = Colors.Red;
+                UrlStatusLabel.Text = "L'URL ne peut pas être vide.";
+                return;
+            }
+
+            // S'assurer que l'URL se termine sans slash pour la cohérence
+            url = url.TrimEnd('/');
+
+            if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+            {
+                UrlStatusLabel.TextColor = Colors.Red;
+                UrlStatusLabel.Text = "URL invalide. Utilisez le format http://ip:port";
+                return;
+            }
+
+            Preferences.Set(ServerUrlKey, url);
+            UrlStatusLabel.TextColor = Color.FromArgb("#4CAF50");
+            UrlStatusLabel.Text = $"URL enregistrée : {url}";
+
+            await DisplayAlert("Redémarrage requis",
+                "L'adresse du serveur a été enregistrée. Veuillez relancer l'application pour appliquer le changement.",
+                "OK");
         }
 
         private async void ChargerConfiguration()

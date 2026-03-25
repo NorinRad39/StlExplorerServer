@@ -3,6 +3,9 @@ using Microsoft.Extensions.Logging;
 using StlExplorerServer.Services;
 using ClassLibStlExploServ;
 using System;
+using System.IO.Compression;
+using SharpCompress.Archives;
+using SharpCompress.Common;
 
 namespace StlExplorerServer.Controllers
 {
@@ -245,6 +248,181 @@ namespace StlExplorerServer.Controllers
             {
                 logger.LogError(ex, "Erreur lors de l'upload des fichiers.");
                 return StatusCode(500, $"Erreur interne : {ex.Message}");
+            }
+        }
+
+        #endregion
+
+        #region Contenu et Fichiers 3D
+
+        /// <summary>
+        /// Liste les fichiers, dossiers et fichiers 3D à la racine du dossier d'un modèle.
+        /// Les fichiers 3D sont aussi détectés à l'intérieur des archives ZIP, RAR et 7z.
+        /// </summary>
+        [HttpGet("modele/{id}/contenu")]
+        public IActionResult GetContenuModele(
+            int id,
+            [FromServices] StlExplorerServer.Repositories.IMetadonneesRepository repository)
+        {
+            var modele = repository.GetModeleById(id);
+            if (modele == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(modele.CheminDossier) || !Directory.Exists(modele.CheminDossier))
+                return NotFound("Dossier introuvable sur le disque.");
+
+            var extensions3D = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { ".stl", ".obj", ".step", ".stp", ".3mf" };
+
+            var contenu = new ContenuModele();
+
+            foreach (var dir in Directory.GetDirectories(modele.CheminDossier))
+                contenu.Dossiers.Add(Path.GetFileName(dir));
+
+            foreach (var file in Directory.GetFiles(modele.CheminDossier))
+            {
+                var fileName = Path.GetFileName(file);
+                contenu.Fichiers.Add(fileName);
+
+                if (extensions3D.Contains(Path.GetExtension(file)))
+                    contenu.Fichiers3D.Add(new Fichier3D { Nom = fileName });
+            }
+
+            // Détecter les fichiers 3D à l'intérieur des archives (ZIP, RAR, 7z)
+            var extensionsArchives = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                { ".zip", ".rar", ".7z" };
+
+            foreach (var file in Directory.GetFiles(modele.CheminDossier))
+            {
+                if (!extensionsArchives.Contains(Path.GetExtension(file)))
+                    continue;
+
+                try
+                {
+                    using var archive = ArchiveFactory.OpenArchive(file);
+                    foreach (var entry in archive.Entries)
+                    {
+                        if (entry.IsDirectory) continue;
+                        var entryName = entry.Key;
+                        if (!string.IsNullOrEmpty(entryName)
+                            && extensions3D.Contains(Path.GetExtension(entryName)))
+                        {
+                            contenu.Fichiers3D.Add(new Fichier3D
+                            {
+                                Nom = entryName,
+                                NomArchive = Path.GetFileName(file)
+                            });
+                        }
+                    }
+                }
+                catch { /* Archive illisible, on l'ignore */ }
+            }
+
+            return Ok(contenu);
+        }
+
+        /// <summary>
+        /// Sert un fichier 3D depuis le dossier du modèle (direct ou extrait d'une archive ZIP, RAR ou 7z).
+        /// </summary>
+        [HttpGet("modele/{id}/fichier3d")]
+        public IActionResult GetFichier3D(
+            int id,
+            [FromQuery] string nom,
+            [FromQuery] string? archive,
+            [FromServices] StlExplorerServer.Repositories.IMetadonneesRepository repository)
+        {
+            var modele = repository.GetModeleById(id);
+            if (modele == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(modele.CheminDossier))
+                return BadRequest("Le modèle n'a pas de chemin de dossier.");
+
+            if (string.IsNullOrWhiteSpace(archive))
+            {
+                var chemin = Path.Combine(modele.CheminDossier, nom);
+                if (!System.IO.File.Exists(chemin))
+                    return NotFound("Fichier 3D introuvable.");
+                return PhysicalFile(chemin, "application/octet-stream", nom);
+            }
+            else
+            {
+                var cheminArchive = Path.Combine(modele.CheminDossier, archive);
+                if (!System.IO.File.Exists(cheminArchive))
+                    return NotFound("Archive introuvable.");
+
+                var extArchive = Path.GetExtension(archive).ToLowerInvariant();
+
+                // Archives ZIP : utiliser System.IO.Compression (plus performant)
+                if (extArchive == ".zip")
+                {
+                    using var zip = ZipFile.OpenRead(cheminArchive);
+                    var zipEntry = zip.GetEntry(nom);
+                    if (zipEntry == null)
+                        return NotFound("Fichier introuvable dans l'archive ZIP.");
+
+                    var ms = new MemoryStream();
+                    using (var entryStream = zipEntry.Open())
+                        entryStream.CopyTo(ms);
+                    ms.Position = 0;
+                    return File(ms, "application/octet-stream", Path.GetFileName(nom));
+                }
+
+                // Archives RAR et 7z : utiliser SharpCompress
+                using var arc = ArchiveFactory.OpenArchive(cheminArchive);
+                var found = arc.Entries.FirstOrDefault(e =>
+                    !e.IsDirectory && string.Equals(e.Key, nom, StringComparison.OrdinalIgnoreCase));
+                if (found == null)
+                    return NotFound("Fichier introuvable dans l'archive.");
+
+                var memStream = new MemoryStream();
+                using (var entryStream = found.OpenEntryStream())
+                    entryStream.CopyTo(memStream);
+                memStream.Position = 0;
+                return File(memStream, "application/octet-stream", Path.GetFileName(nom));
+            }
+        }
+
+        /// <summary>
+        /// Renomme le dossier physique d'un modèle sur le NAS et met à jour la base de données.
+        /// </summary>
+        [HttpPut("renommerModele/{id}")]
+        public IActionResult RenommerModele(
+            int id,
+            [FromBody] RenommerModeleRequete requete,
+            [FromServices] StlExplorerServer.Repositories.IMetadonneesRepository repository)
+        {
+            if (string.IsNullOrWhiteSpace(requete.NouveauNom))
+                return BadRequest("Le nouveau nom est requis.");
+
+            var modele = repository.GetModeleById(id);
+            if (modele == null) return NotFound();
+            if (string.IsNullOrWhiteSpace(modele.CheminDossier))
+                return BadRequest("Le modèle n'a pas de chemin de dossier.");
+
+            var dossierParent = Path.GetDirectoryName(modele.CheminDossier);
+            if (dossierParent == null) return BadRequest("Chemin parent introuvable.");
+
+            var nouveauChemin = Path.Combine(dossierParent, requete.NouveauNom);
+            if (Directory.Exists(nouveauChemin))
+                return Conflict("Un dossier avec ce nom existe déjà.");
+
+            try
+            {
+                Directory.Move(modele.CheminDossier, nouveauChemin);
+
+                var ancienChemin = modele.CheminDossier;
+                modele.CheminsImages = modele.CheminsImages
+                    .Select(img => img.Replace(ancienChemin, nouveauChemin))
+                    .ToList();
+
+                modele.CheminDossier = nouveauChemin;
+                modele.Description = requete.NouveauNom;
+                repository.UpdateModele(modele);
+
+                logger.LogInformation("Modèle renommé : {Ancien} → {Nouveau}", ancienChemin, nouveauChemin);
+                return Ok(modele);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Erreur lors du renommage du modèle.");
+                return StatusCode(500, $"Erreur lors du renommage : {ex.Message}");
             }
         }
 

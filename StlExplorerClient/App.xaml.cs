@@ -13,13 +13,17 @@ namespace StlExplorerClient
         {
             var window = new Window(new AppShell());
 
-            // Taille fixe de la fenêtre (Windows uniquement, ignoré sur mobile)
-            window.Width = 750;
-            window.Height = 950;
-            window.MinimumWidth = 750;
-            window.MinimumHeight = 950;
-            window.MaximumWidth = 750;
-            window.MaximumHeight = 950;
+#if WINDOWS
+            // Taille par défaut généreuse et fenêtre librement redimensionnable
+            window.Width = 800;
+            window.MinimumWidth = 550;
+            window.MinimumHeight = 600;
+
+            // Adapter la hauteur à l'écran disponible
+            var displayInfo = DeviceDisplay.Current.MainDisplayInfo;
+            var screenHeight = displayInfo.Height / displayInfo.Density;
+            window.Height = Math.Min(screenHeight - 80, 1400);
+#endif
 
             return window;
         }

@@ -8,6 +8,48 @@
     <ScrollView>
         <VerticalStackLayout Padding="30" Spacing="20">
 
+            <!-- ========== Adresse du serveur ========== -->
+            <Label Text="Adresse du serveur"
+                   FontSize="20"
+                   FontAttributes="Bold"
+                   TextColor="#E0E0E0" />
+
+            <Label Text="URL ou IP du serveur API (ex: http://192.168.20.253:5182). Le changement est appliqué immédiatement."
+                   FontSize="13"
+                   TextColor="#888" />
+
+            <Grid ColumnDefinitions="*, 140" ColumnSpacing="10">
+                <Border Grid.Column="0"
+                        Stroke="#555"
+                        StrokeThickness="1"
+                        BackgroundColor="#383838"
+                        HeightRequest="40"
+                        Padding="0">
+                    <Entry x:Name="ServerUrlEntry"
+                           Placeholder="http://192.168.20.253:5182"
+                           TextColor="#E0E0E0"
+                           PlaceholderColor="#888"
+                           BackgroundColor="Transparent"
+                           Keyboard="Url" />
+                </Border>
+                <Button Grid.Column="1"
+                        Text="✔ Appliquer"
+                        BackgroundColor="#2E7D32"
+                        TextColor="White"
+                        FontSize="14"
+                        CornerRadius="5"
+                        HeightRequest="40"
+                        Clicked="OnAppliquerUrlClicked" />
+            </Grid>
+
+            <Label x:Name="UrlStatusLabel"
+                   Text=""
+                   TextColor="#4CAF50"
+                   FontSize="13" />
+
+            <BoxView HeightRequest="1" Color="#444" Margin="0,5" />
+
+            <!-- ========== Dossiers racines ========== -->
             <Label Text="Dossiers racines a scanner"
                    FontSize="20"
                    FontAttributes="Bold"

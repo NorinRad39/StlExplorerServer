@@ -17,6 +17,17 @@ namespace StlExplorerClient.WinUI
         public App()
         {
             this.InitializeComponent();
+            this.UnhandledException += OnUnhandledException;
+        }
+
+        private void OnUnhandledException(object sender, Microsoft.UI.Xaml.UnhandledExceptionEventArgs e)
+        {
+            var logPath = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                "StlExplorerCrash.log");
+            System.IO.File.WriteAllText(logPath,
+                $"{DateTime.Now}\n{e.Exception}\n\nMessage: {e.Message}\n\nStackTrace: {e.Exception?.StackTrace}");
+            e.Handled = true;
         }
 
         protected override MauiApp CreateMauiApp() => MauiProgram.CreateMauiApp();

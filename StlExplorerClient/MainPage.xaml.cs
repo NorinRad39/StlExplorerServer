@@ -15,6 +15,8 @@ namespace StlExplorerClient
         private List<Fichier3D> _currentFichiers3D = new();
         private bool _viewer3DVisible;
 
+        private bool _dataLoaded;
+
         public MainPage()
         {
             InitializeComponent();
@@ -23,7 +25,16 @@ namespace StlExplorerClient
             if (DeviceInfo.Platform == DevicePlatform.WinUI)
                 WindowsActionsPanel.IsVisible = true;
 
-            LoadDataAsync();
+            Loaded += OnPageLoaded;
+        }
+
+        private async void OnPageLoaded(object? sender, EventArgs e)
+        {
+            if (!_dataLoaded)
+            {
+                _dataLoaded = true;
+                await LoadDataAsync();
+            }
         }
 
         private async Task LoadDataAsync()
@@ -57,7 +68,15 @@ namespace StlExplorerClient
             }
             catch (Exception ex)
             {
-                await DisplayAlert("Erreur", "Impossible de contacter le serveur : " + ex.Message, "OK");
+                try
+                {
+                    await DisplayAlert("Erreur", "Impossible de contacter le serveur : " + ex.Message, "OK");
+                }
+                catch
+                {
+                    // WinUI peut échouer si la page n'est pas encore dans l'arbre visuel
+                    System.Diagnostics.Debug.WriteLine($"Erreur serveur : {ex.Message}");
+                }
             }
         }
 

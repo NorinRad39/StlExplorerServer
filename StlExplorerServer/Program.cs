@@ -61,7 +61,11 @@ builder.Services.AddScoped<IMetadonneesRepository, MetadataRepository>();
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
         builder.Configuration.GetConnectionString("DefaultConnection"),
-        new MariaDbServerVersion(new Version(10, 11, 0)) // Contournement de l'erreur AutoDetect avec Pomelo et .NET
+        new MariaDbServerVersion(new Version(10, 11, 0)), // Contournement de l'erreur AutoDetect avec Pomelo et .NET
+        mySqlOptions => mySqlOptions.EnableRetryOnFailure(
+            maxRetryCount: 10,
+            maxRetryDelay: TimeSpan.FromSeconds(30),
+            errorNumbersToAdd: null)
     ));
 
 #endregion
@@ -85,6 +89,28 @@ builder.Logging.AddDebug();       // Affiche les messages dans la fenêtre "Sorti
 /// l'instance de l'application web (app) prête à configurer comment les requêtes web seront traitées.
 /// </summary>
 var app = builder.Build();
+
+// Appliquer automatiquement les migrations EF Core au démarrage (crée les tables si la base est vide)
+// Boucle de retry pour laisser le temps à MariaDB de démarrer dans Docker
+var maxRetries = 15;
+for (int i = 0; i < maxRetries; i++)
+{
+    try
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        db.Database.Migrate();
+        app.Logger.LogInformation("Migrations appliquées avec succès.");
+        break;
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogWarning("Tentative {Attempt}/{MaxRetries} — MariaDB pas encore prêt : {Message}", i + 1, maxRetries, ex.Message);
+        if (i == maxRetries - 1)
+            throw; // Dernière tentative, on laisse l'exception remonter
+        Thread.Sleep(TimeSpan.FromSeconds(5));
+    }
+}
 
 /* 
  * PIPELINE MIDDLEWARES : 

@@ -1,0 +1,48 @@
+services:
+  # ── Base de données MariaDB ──
+  mariadb:
+    image: mariadb:10.11
+    container_name: stlexplorer-mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "RootP@ss2026!"
+      MYSQL_DATABASE: "StlExplorerServer"
+      MYSQL_USER: "stluser"
+      MYSQL_PASSWORD: "StlP@ss2026!"
+    ports:
+      - "3307:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      start_period: 120s
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── API StlExplorer ──
+  # Pour reconstruire l'image localement : docker build -t stlexplorer-api -f StlExplorerServer/Dockerfile .
+  stlexplorer-api:
+    image: stlexplorer-api:latest
+    container_name: stlexplorer-api
+    restart: unless-stopped
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    ports:
+      - "5182:8080"
+    environment:
+      # Connexion à MariaDB (le nom 'mariadb' est résolu par Docker Compose)
+      ConnectionStrings__DefaultConnection: "Server=mariadb;Port=3306;Database=StlExplorerServer;User=stluser;Password=StlP@ss2026!;"
+      # Dossiers racines à scanner (chemin tel que vu dans le conteneur)
+      ScannerSettings__RootDirectories__0: "/data/3D_Maquettes"
+      # Désactiver HTTPS dans le conteneur
+      ASPNETCORE_URLS: "http://+:8080"
+    volumes:
+      # Monter le partage NAS dans le conteneur
+      # À gauche : chemin réel sur le NAS Synology (ex: /volume1/Maquette/3D_Maquettes)
+      # À droite : chemin dans le conteneur (doit correspondre à ScannerSettings ci-dessus)
+      - /volume1/Maquette/3D_Maquettes:/data/3D_Maquettes:rw
+
+volumes:
+  mariadb_data:

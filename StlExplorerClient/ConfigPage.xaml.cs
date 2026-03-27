@@ -18,6 +18,10 @@ namespace StlExplorerClient
             // Charger l'URL actuelle du serveur
             ServerUrlEntry.Text = Preferences.Get(ServerUrlKey, _httpClient?.BaseAddress?.ToString() ?? DefaultServerUrl);
 
+            // Le bouton Parcourir n'est disponible que sur Windows
+            if (DeviceInfo.Platform == DevicePlatform.WinUI)
+                BtnParcourir.IsVisible = true;
+
             ChargerConfiguration();
         }
 
@@ -48,6 +52,37 @@ namespace StlExplorerClient
             await DisplayAlert("Redémarrage requis",
                 "L'adresse du serveur a été enregistrée. Veuillez relancer l'application pour appliquer le changement.",
                 "OK");
+        }
+
+        private async void OnParcourirDossierClicked(object sender, EventArgs e)
+        {
+#if WINDOWS
+            try
+            {
+                var picker = new Windows.Storage.Pickers.FolderPicker();
+                picker.SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Desktop;
+                picker.FileTypeFilter.Add("*");
+
+                // Récupérer le handle de la fenêtre WinUI pour initialiser le picker
+                var window = Application.Current?.Windows.FirstOrDefault();
+                if (window?.Handler?.PlatformView is Microsoft.UI.Xaml.Window mauiWindow)
+                {
+                    var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(mauiWindow);
+                    WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+                }
+
+                var folder = await picker.PickSingleFolderAsync();
+                if (folder != null)
+                {
+                    NouveauDossierEntry.Text = folder.Path;
+                }
+            }
+            catch (Exception ex)
+            {
+                StatusLabel.TextColor = Colors.Red;
+                StatusLabel.Text = "Erreur lors de la sélection : " + ex.Message;
+            }
+#endif
         }
 
         private async void ChargerConfiguration()

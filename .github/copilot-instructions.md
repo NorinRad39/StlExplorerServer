@@ -83,3 +83,10 @@ Voici les commandes à exécuter dans le **terminal intégré** (à la racine du
 
 2. **Appliquer la migration** (exécute le SQL pour mettre à jour la base MariaDB) :
    `dotnet ef database update`
+
+Il faut ameliorer le system de scan pour se faire en background et ne pas bloquer le thread principal de l'API. Utiliser des tâches asynchrones (Task.Run) pour lancer le scan en arrière-plan, et implémenter un système de file d'attente ou de signalisation pour éviter les scans simultanés. Il faut resoudre ce probleme de time out.
+Il faudrait aussi implémenter un système de cache pour les métadonnées scannées, afin de réduire la charge sur le NAS et d'améliorer les temps de réponse de l'API. Le cache pourrait être invalidé périodiquement ou manuellement via un endpoint dédié.
+Il faudrait que le si aucun dossier a scanner n'est configurer, la question soit poser au 1er lancement du client puis une fois qu'il yen a un que le scan se face en tache de font et automatiquement au demarrage du serveur.
+
+La base de données n'est pas sur docker il faut donc une ip dans la chaine de connexion. Je n'ai pas l'impression que ça focntionne avec une url. j'ai configurer l'url https://stl.file4all.fr dans mon serveur dns perso du syno et dans mon le reverse proxy du syno mais je ne suis pas sur que ça marche
+

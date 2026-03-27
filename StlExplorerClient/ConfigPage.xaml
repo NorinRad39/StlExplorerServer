@@ -96,7 +96,7 @@
                 </CollectionView>
             </Border>
 
-            <Grid ColumnDefinitions="*, 120" ColumnSpacing="10">
+            <Grid ColumnDefinitions="*, Auto, 120" ColumnSpacing="10">
                 <Border Grid.Column="0"
                         Stroke="#555"
                         StrokeThickness="1"
@@ -109,7 +109,18 @@
                            PlaceholderColor="#888"
                            BackgroundColor="Transparent" />
                 </Border>
-                <Button Grid.Column="1"
+                <Button x:Name="BtnParcourir"
+                        Grid.Column="1"
+                        Text="📂 Parcourir"
+                        BackgroundColor="#6A1B9A"
+                        TextColor="White"
+                        FontSize="14"
+                        CornerRadius="5"
+                        HeightRequest="40"
+                        Padding="15,0"
+                        IsVisible="False"
+                        Clicked="OnParcourirDossierClicked" />
+                <Button Grid.Column="2"
                         Text="+ Ajouter"
                         BackgroundColor="#2E7D32"
                         TextColor="White"

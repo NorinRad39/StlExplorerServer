@@ -177,14 +177,14 @@ namespace StlExplorerClient
             {
                 BtnRelancerScan.IsEnabled = false;
                 StatusLabel.TextColor = Color.FromArgb("#E0E0E0");
-                StatusLabel.Text = "Scan en cours...";
+                StatusLabel.Text = "Synchronisation intelligente en cours...";
 
-                var response = await _httpClient.PostAsync("/api/Metadata/scanAll", null);
+                var response = await _httpClient.PostAsync("/api/Metadata/syncSmart", null);
 
                 if (response.IsSuccessStatusCode)
                 {
                     StatusLabel.TextColor = Color.FromArgb("#4CAF50");
-                    StatusLabel.Text = "Scan termine avec succes.";
+                    StatusLabel.Text = "Synchronisation intelligente lancée en tâche de fond.";
                 }
                 else
                 {

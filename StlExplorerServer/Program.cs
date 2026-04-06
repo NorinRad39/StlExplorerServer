@@ -46,6 +46,11 @@ builder.Services.AddControllers()
 builder.Services.AddScoped<IFolderScannerService, FolderScannerService>();
 builder.Services.AddScoped<IMetadonneesRepository, MetadataRepository>();
 
+// Service hébergé (singleton) pour le scan en arrière-plan, la surveillance FileSystemWatcher
+// et la gestion sécurisée des scopes DI (résout le problème de DbContext disposé).
+builder.Services.AddSingleton<BackgroundScannerHostedService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<BackgroundScannerHostedService>());
+
 #endregion
 
 #region Configuration de la Base de Données (Entity Framework)

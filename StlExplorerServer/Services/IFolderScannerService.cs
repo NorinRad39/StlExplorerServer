@@ -3,6 +3,9 @@
     public interface IFolderScannerService
     {
         void ScanFolder(string path);
-        void ScanAllConfiguredFolders(); // <-- Nouvelle méthode ajoutée au contrat
+        void ScanAllConfiguredFolders();
+        void ActualiserBaseDepuisDossier(string path);
+        void SynchronisationIntelligente();
+        void InvaliderCache(string? path = null);
     }
 }

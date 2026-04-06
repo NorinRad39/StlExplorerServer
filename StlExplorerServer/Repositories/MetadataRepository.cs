@@ -6,9 +6,45 @@ using System.Linq;
 namespace StlExplorerServer.Repositories
 {
     // ... Les commentaires ont été réduits pour plus de lisibilité ...
-    public class MetadataRepository(ApplicationDbContext context) : IMetadonneesRepository
+    public class MetadataRepository : IMetadonneesRepository
     {
+        private readonly ApplicationDbContext context;
+
+        public MetadataRepository(ApplicationDbContext context)
+        {
+            this.context = context;
+        }
+
         #region Méthodes pour Modele
+
+        /// <summary>
+        /// Supprime un <see cref="Modele"/> de la base de données.
+        /// </summary>
+        public void DeleteModele(int modeleId)
+        {
+            var modele = GetModeleById(modeleId);
+            if (modele != null)
+            {
+                context.Modeles.Remove(modele);
+                context.SaveChanges();
+            }
+        }
+
+        /// <summary>
+        /// Récupère tous les modèles associés à un Sujet donné.
+        /// </summary>
+        public IEnumerable<Modele> GetModelesBySujetId(int sujetId)
+        {
+            return context.Modeles.Where(m => m.SujetID == sujetId).ToList();
+        }
+
+        /// <summary>
+        /// Récupère tous les chemins de dossiers des modèles enregistrés.
+        /// </summary>
+        public IEnumerable<string> GetAllModelesChemins()
+        {
+            return context.Modeles.Select(m => m.CheminDossier).ToList();
+        }
 
         /// <summary>
         /// Recherche et récupère un <see cref="Modele"/> par son chemin physique exact.
@@ -92,6 +128,23 @@ namespace StlExplorerServer.Repositories
 
         #region Méthodes pour Sujet
 
+        /// <summary>
+        /// Supprime un <see cref="Sujet"/> de la base de données.
+        /// </summary>
+        public void DeleteSujet(Sujet sujet)
+        {
+            context.Sujets.Remove(sujet);
+            context.SaveChanges();
+        }
+
+        /// <summary>
+        /// Récupère tous les sujets associés à une Famille donnée.
+        /// </summary>
+        public IEnumerable<Sujet> GetSujetsByFamilleId(int familleId)
+        {
+            return context.Sujets.Where(s => s.FamilleID == familleId).ToList();
+        }
+
         public Sujet? GetSujetByNameAndFamilleId(string name, int familleId)
         {
             return context.Sujets.FirstOrDefault(s => s.NomSujet == name && s.FamilleID == familleId);
@@ -111,6 +164,15 @@ namespace StlExplorerServer.Repositories
         #endregion
 
         #region Méthodes pour Famille
+
+        /// <summary>
+        /// Supprime une <see cref="Famille"/> de la base de données.
+        /// </summary>
+        public void DeleteFamille(Famille famille)
+        {
+            context.Familles.Remove(famille);
+            context.SaveChanges();
+        }
 
         public Famille? GetFamilleByName(string name)
         {

@@ -130,6 +130,16 @@
                             Padding="15,0"
                             IsVisible="False"
                             Clicked="OnOuvrirExplorateurClicked" />
+        <Button x:Name="BtnActualiserBase"
+                Text="🔄 Actualiser la base"
+                BackgroundColor="#455A64"
+                TextColor="White"
+                FontSize="14"
+                CornerRadius="5"
+                HeightRequest="40"
+                Padding="15,0"
+                HorizontalOptions="Start"
+                Clicked="OnActualiserBaseClicked" />
                 </HorizontalStackLayout>
 
                 <!-- Contenu du dossier (fichiers et sous-dossiers à la racine) -->

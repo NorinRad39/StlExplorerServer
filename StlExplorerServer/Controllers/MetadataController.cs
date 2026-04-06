@@ -24,8 +24,22 @@ namespace StlExplorerServer.Controllers
     /// </remarks>
     [ApiController]
     [Route("api/[controller]")]
-    public class MetadataController(IFolderScannerService folderScannerService, ILogger<MetadataController> logger) : ControllerBase
+    public class MetadataController : ControllerBase
     {
+        private readonly IFolderScannerService folderScannerService;
+        private readonly ILogger<MetadataController> logger;
+        private readonly BackgroundScannerHostedService backgroundScanner;
+
+        public MetadataController(
+            IFolderScannerService folderScannerService,
+            ILogger<MetadataController> logger,
+            BackgroundScannerHostedService backgroundScanner)
+        {
+            this.folderScannerService = folderScannerService;
+            this.logger = logger;
+            this.backgroundScanner = backgroundScanner;
+        }
+
         #region Points de Terminaison (Endpoints)
 
         /// <summary>
@@ -63,6 +77,34 @@ namespace StlExplorerServer.Controllers
                 logger.LogError(ex, "Erreur interne du serveur lors du scan des dossiers configurés.");
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
+        }
+
+        /// <summary>
+        /// Lance la synchronisation complète (ajout, suppression, modification) en tâche de fond
+        /// via le service hébergé (scope DI sécurisé).
+        /// </summary>
+        [HttpPost("refreshAll")]
+        public async Task<IActionResult> RefreshAllConfiguredFolders()
+        {
+            var lance = await backgroundScanner.LancerSynchronisationAsync();
+            if (lance)
+                return Ok("Synchronisation lancée en tâche de fond.");
+            else
+                return Conflict("Un scan ou une synchronisation est déjà en cours.");
+        }
+
+        /// <summary>
+        /// Lance la synchronisation intelligente (scan complet sur nouveaux dossiers racines, mise à jour sur les autres) en tâche de fond
+        /// via le service hébergé (scope DI sécurisé).
+        /// </summary>
+        [HttpPost("sync-intelligent")]
+        public async Task<IActionResult> LancerSyncIntelligente()
+        {
+            var lance = await backgroundScanner.LancerSynchronisationAsync();
+            if (lance)
+                return Ok("Synchronisation intelligente lancée en arrière-plan.");
+            else
+                return Conflict("Un scan est déjà en cours.");
         }
 
         /// <summary>
@@ -251,6 +293,34 @@ namespace StlExplorerServer.Controllers
             }
         }
 
+        /// <summary>
+        /// Vérifie si un scan est en cours.
+        /// </summary>
+        [HttpGet("scan-status")]
+        public IActionResult GetScanStatus()
+        {
+            return Ok(new { scanEnCours = backgroundScanner.ScanEnCours });
+        }
+
+        /// <summary>
+        /// Vide le cache des modèles (endpoint de maintenance).
+        /// </summary>
+        [HttpPost("invalidate-cache")]
+        public IActionResult InvalidateCache()
+        {
+            backgroundScanner.InvaliderCache();
+            return Ok("Cache invalidé.");
+        }
+
+        /// <summary>
+        /// Récupère le pourcentage d'avancement du scan en cours.
+        /// </summary>
+        [HttpGet("scan-progress")]
+        public IActionResult GetScanProgress()
+        {
+            return Ok(new { progression = backgroundScanner.ProgressionScan });
+        }
+
         #endregion
 
         #region Contenu et Fichiers 3D
@@ -437,7 +507,7 @@ namespace StlExplorerServer.Controllers
         public IActionResult GetRootDirectories(
             [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
-            var roots = configuration.GetSection("ScannerSettings:RootDirectories").Get<string[]>() ?? [];
+            var roots = configuration.GetSection("ScannerSettings:RootDirectories").Get<string[]>() ?? new string[0];
             return Ok(roots);
         }
 

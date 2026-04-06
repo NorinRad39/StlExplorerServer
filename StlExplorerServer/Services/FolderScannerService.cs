@@ -39,13 +39,17 @@ namespace StlExplorerServer.Services
             {
                 logger.LogInformation("Début du scan pour le chemin : {Path}", path);
 
-                var modeleDirectories = GetModeleDirectories(new DirectoryInfo(path));
-
+                var modeleDirectories = GetModeleDirectories(new DirectoryInfo(path)).ToList();
+                int total = modeleDirectories.Count;
+                int current = 0;
                 foreach (var directory in modeleDirectories)
                 {
                     // Nous déléguons la gestion des doublons dans la méthode dédiée
                     GetOrCreateModele(directory);
+                    current++;
+                    _progressionScan = total > 0 ? (int)(current * 100.0 / total) : 100;
                 }
+                _progressionScan = 100;
             }
             else
             {
@@ -59,26 +63,136 @@ namespace StlExplorerServer.Services
         /// </summary>
         public void ScanAllConfiguredFolders()
         {
-            // Lire la liste depuis le appsettings.json
             var rootDirs = configuration.GetSection("ScannerSettings:RootDirectories").Get<string[]>();
-
             if (rootDirs == null || rootDirs.Length == 0)
             {
                 logger.LogWarning("Aucun dossier racine configuré dans appsettings.json.");
                 return;
             }
 
+            var allModeles = rootDirs.SelectMany(dir =>
+                Directory.Exists(dir) ? GetModeleDirectories(new DirectoryInfo(dir)) : Enumerable.Empty<DirectoryInfo>()
+            ).ToList();
+
+            int total = allModeles.Count;
+            int current = 0;
+
+            lock (_progressionLock) { _progressionScan = 0; }
+
+            foreach (var directory in allModeles)
+            {
+                GetOrCreateModele(directory);
+                current++;
+                lock (_progressionLock)
+                {
+                    _progressionScan = total > 0 ? (int)(current * 100.0 / total) : 100;
+                }
+            }
+            lock (_progressionLock) { _progressionScan = 100; }
+        }
+
+        /// <summary>
+        /// Actualise la base de données à partir de l'état du disque :
+        /// - Supprime les modèles absents du disque
+        /// - Ajoute ou met à jour les modèles présents sur le disque
+        /// </summary>
+        /// <param name="path">Chemin racine à synchroniser</param>
+        public void ActualiserBaseDepuisDossier(string path)
+        {
+            if (!Directory.Exists(path))
+            {
+                logger.LogError("Le répertoire spécifié n'existe pas : {Path}", path);
+                throw new DirectoryNotFoundException($"Le répertoire spécifié n'existe pas : {path}");
+            }
+
+            logger.LogInformation("Synchronisation de la base avec le disque pour le chemin : {Path}", path);
+            SynchroniserModelesAvecDisque(path);
+            ScanFolder(path); // Ajoute ou met à jour les modèles présents
+
+            // Invalider le cache pour ce chemin
+            InvaliderCache(path);
+        }
+
+        /// <summary>
+        /// Synchronisation intelligente : scan complet sur les nouveaux dossiers racines, mise à jour sur les autres.
+        /// </summary>
+        public void SynchronisationIntelligente()
+        {
+            var rootDirs = configuration.GetSection("ScannerSettings:RootDirectories").Get<string[]>();
+            if (rootDirs == null || rootDirs.Length == 0)
+            {
+                logger.LogWarning("Aucun dossier racine configuré dans appsettings.json.");
+                return;
+            }
+
+            // Récupérer tous les chemins de modèles connus en base
+            var cheminsModelesEnBase = new HashSet<string>(metadataRepository.GetAllModelesChemins(), StringComparer.OrdinalIgnoreCase);
+
             foreach (var dir in rootDirs)
             {
-                try
+                if (!Directory.Exists(dir))
                 {
-                    logger.LogInformation("Lancement du scan pour le dossier configuré : {Dir}", dir);
-                    ScanFolder(dir); // Appelle votre méthode existante
+                    logger.LogWarning("Dossier racine inexistant : {Dir}", dir);
+                    continue;
                 }
-                catch (Exception ex)
+
+                // Si aucun modèle de ce dossier n'est connu, scan complet
+                bool isNouveau = !cheminsModelesEnBase.Any(c => c.StartsWith(dir, StringComparison.OrdinalIgnoreCase));
+                if (isNouveau)
                 {
-                    logger.LogError(ex, "Erreur lors du scan du dossier {Dir}", dir);
-                    // On continue avec le dossier suivant même si un a planté
+                    logger.LogInformation("Nouveau dossier racine détecté, scan complet : {Dir}", dir);
+                    ScanFolder(dir);
+                }
+                else
+                {
+                    logger.LogInformation("Mise à jour du dossier racine existant : {Dir}", dir);
+                    ActualiserBaseDepuisDossier(dir);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Invalide le cache mémoire pour tous les dossiers ou un dossier spécifique.
+        /// </summary>
+        public void InvaliderCache(string? path = null)
+        {
+            lock (_cacheLock)
+            {
+                if (path == null)
+                {
+                    _cacheModeles.Clear();
+                }
+                else
+                {
+                    _cacheModeles.Remove(path);
+                }
+            }
+        }
+
+        /// <summary>
+        /// Supprime de la base les modèles qui n'existent plus sur le disque.
+        /// Ne supprime que les modèles dont le CheminDossier appartient au chemin racine donné,
+        /// pour ne pas supprimer les modèles d'autres dossiers racines.
+        /// </summary>
+        /// <param name="path">Chemin racine à synchroniser</param>
+        private void SynchroniserModelesAvecDisque(string path)
+        {
+            // Filtrer uniquement les modèles appartenant à ce dossier racine
+            var modelesEnBase = metadataRepository.GetAllModeles()
+                .Where(m => m.CheminDossier != null && m.CheminDossier.StartsWith(path, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var cheminsModelesDisque = new HashSet<string>(
+                GetModeleDirectories(new DirectoryInfo(path)).Select(d => d.FullName),
+                StringComparer.OrdinalIgnoreCase
+            );
+
+            foreach (var modele in modelesEnBase)
+            {
+                if (!cheminsModelesDisque.Contains(modele.CheminDossier))
+                {
+                    logger.LogInformation("Suppression du modèle absent du disque : {Chemin}", modele.CheminDossier);
+                    metadataRepository.DeleteModele(modele.ModeleID);
                 }
             }
         }
@@ -234,6 +348,21 @@ namespace StlExplorerServer.Services
         }
 
         #endregion
+
+        // Cache mémoire simple pour les modèles (clé: chemin racine, valeur: liste de modèles)
+        private static readonly Dictionary<string, List<Modele>> _cacheModeles = new();
+        private static readonly object _cacheLock = new();
+        private static readonly object _progressionLock = new();
+        private static int _progressionScan = 0;
+
+        /// <summary>
+        /// Pourcentage d'avancement du scan, accessible en lecture statique
+        /// par le <see cref="BackgroundScannerHostedService"/>.
+        /// </summary>
+        internal static int ProgressionScanStatique
+        {
+            get { lock (_progressionLock) { return _progressionScan; } }
+        }
     }
 
     #endregion

@@ -77,6 +77,16 @@ namespace StlExplorerServer.Repositories
         /// Récupère les chemins des images d'un modèle spécifique de manière asynchrone.
         /// </summary>
         Task<List<string>> GetImagesForModeleAsync(int modeleId);
+
+        /// <summary>
+        /// Retourne la liste des chemins de tous les modèles connus.
+        /// </summary>
+        IEnumerable<string> GetAllModelesChemins();
+
+        /// <summary>
+        /// Supprime un modèle de la base de données à partir de son ID.
+        /// </summary>
+        void DeleteModele(int modeleId);
     }
 }
 

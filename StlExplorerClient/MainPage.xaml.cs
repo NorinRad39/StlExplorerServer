@@ -274,7 +274,7 @@ namespace StlExplorerClient
                     {
                         _currentImages = images;
                         _currentImageIndex = 0;
-                        DisplayCurrentImage();
+                        await DisplayCurrentImageAsync();
                     }
                     else
                     {
@@ -350,14 +350,34 @@ namespace StlExplorerClient
             _currentFichiers3D.Clear();
         }
 
-        private void DisplayCurrentImage()
+        /// <summary>
+        /// Télécharge et affiche l'image courante via HttpClient.
+        /// Utilise ImageSource.FromStream au lieu de ImageSource.FromUri
+        /// pour éviter les problèmes de chemins UNC encodés et de cache plateforme.
+        /// </summary>
+        private async Task DisplayCurrentImageAsync()
         {
-            if (_currentImageIndex >= 0 && _currentImageIndex < _currentImages.Count)
+            if (_currentImageIndex >= 0 && _currentImageIndex < _currentImages.Count && _httpClient != null)
             {
                 var imagePath = _currentImages[_currentImageIndex];
                 var encodedPath = Uri.EscapeDataString(imagePath);
-                var imageUrl = $"{_httpClient?.BaseAddress}api/Metadata/image?chemin={encodedPath}";
-                ModeleImage.Source = ImageSource.FromUri(new Uri(imageUrl));
+                try
+                {
+                    var response = await _httpClient.GetAsync($"api/Metadata/image?chemin={encodedPath}");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var bytes = await response.Content.ReadAsByteArrayAsync();
+                        ModeleImage.Source = ImageSource.FromStream(() => new MemoryStream(bytes));
+                    }
+                    else
+                    {
+                        ModeleImage.Source = null;
+                    }
+                }
+                catch
+                {
+                    ModeleImage.Source = null;
+                }
                 ImageCounterLabel.Text = $"{_currentImageIndex + 1} / {_currentImages.Count}";
             }
             else
@@ -366,23 +386,23 @@ namespace StlExplorerClient
             }
         }
 
-        private void OnImagePrecedenteClicked(object sender, EventArgs e)
+        private async void OnImagePrecedenteClicked(object sender, EventArgs e)
         {
             if (_currentImages.Count > 0)
             {
                 _currentImageIndex--;
                 if (_currentImageIndex < 0) _currentImageIndex = _currentImages.Count - 1; // Boucler
-                DisplayCurrentImage();
+                await DisplayCurrentImageAsync();
             }
         }
 
-        private void OnImageSuivanteClicked(object sender, EventArgs e)
+        private async void OnImageSuivanteClicked(object sender, EventArgs e)
         {
             if (_currentImages.Count > 0)
             {
                 _currentImageIndex++;
                 if (_currentImageIndex >= _currentImages.Count) _currentImageIndex = 0; // Boucler
-                DisplayCurrentImage();
+                await DisplayCurrentImageAsync();
             }
         }
 
@@ -735,6 +755,38 @@ namespace StlExplorerClient
         private async void OnConfigClicked(object sender, EventArgs e)
         {
             await Navigation.PushAsync(new ConfigPage(_httpClient));
+        }
+
+        private async void OnActualiserBaseClicked(object sender, EventArgs e)
+        {
+            if (_httpClient == null)
+            {
+                await DisplayAlert("Erreur", "Client HTTP non initialisé.", "OK");
+                return;
+            }
+            try
+            {
+                BtnActualiserBase.IsEnabled = false;
+                var response = await _httpClient.PostAsync("/api/Metadata/refreshAll", null);
+                if (response.IsSuccessStatusCode)
+                {
+                    await DisplayAlert("Succès", "La base de données a été actualisée.", "OK");
+                    await LoadDataAsync(); // Recharge les données après actualisation
+                }
+                else
+                {
+                    var erreur = await response.Content.ReadAsStringAsync();
+                    await DisplayAlert("Erreur", $"Le serveur a répondu : {erreur}", "OK");
+                }
+            }
+            catch (Exception ex)
+            {
+                await DisplayAlert("Erreur", "Impossible d'actualiser la base : " + ex.Message, "OK");
+            }
+            finally
+            {
+                BtnActualiserBase.IsEnabled = true;
+            }
         }
     }
 }

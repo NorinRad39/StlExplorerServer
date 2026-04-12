@@ -127,6 +127,16 @@ namespace StlExplorerServer.Controllers
             [FromServices] StlExplorerServer.Repositories.IMetadonneesRepository repository)
         {
             var modeles = await repository.GetAllModelesResumeAsync();
+
+            foreach (var m in modeles)
+            {
+                if (!string.IsNullOrEmpty(m.CheminDossier) && m.CheminDossier.StartsWith("/data/3D_Maquettes"))
+                {
+                    m.CheminDossier = m.CheminDossier
+                                    .Replace("/data/3D_Maquettes", @"\\ds923.file4all.fr\Maquette\3D_Maquettes")
+                                    .Replace('/', '\\');
+                }
+            }
             return Ok(modeles);
         }
 

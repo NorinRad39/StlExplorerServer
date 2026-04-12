@@ -720,6 +720,16 @@ namespace StlExplorerClient
             }
         }
 
+        private static string AdapterCheminPourWindows(string chemin)
+        {
+            if (chemin.StartsWith(@"\data", StringComparison.OrdinalIgnoreCase))
+            {
+                // Remplace \data par \\ds923.file4all.fr\Maquette
+                return @"\\ds923.file4all.fr\Maquette" + chemin.Substring(5).Replace('/', '\\');
+            }
+            return chemin.Replace('/', '\\');
+        }
+
         /// <summary>
         /// Appelle le serveur pour créer l'arborescence Famille > Sujet > Modèle sur le NAS
         /// et enregistrer les entités en base de données.
@@ -749,7 +759,8 @@ namespace StlExplorerClient
                             ModeleID = modeleCree.ModeleID,
                             Description = requete.NomModele,
                             NomFamille = requete.NomFamille,
-                            NomSujet = requete.NomSujet
+                            NomSujet = requete.NomSujet,
+                            CheminDossier = modeleCree.CheminDossier
                         };
                         _allModeles.Add(resume);
                         _modeleCourant = resume;
@@ -758,6 +769,26 @@ namespace StlExplorerClient
                     await DisplayAlert("Succès",
                         $"Dossier créé :\n{requete.NomFamille} > {requete.NomSujet} > {requete.NomModele}",
                         "OK");
+
+                    // Ouvre le dossier dans l'explorateur Windows
+
+#if WINDOWS
+    var chemin = AdapterCheminPourWindows(modeleCree.CheminDossier);
+    if (!string.IsNullOrEmpty(chemin) && chemin.StartsWith(@"\data", StringComparison.OrdinalIgnoreCase))
+        chemin = @"\\ds923.file4all.fr\Maquette" + chemin.Substring(5).Replace('/', '\\');
+    else
+        chemin = chemin?.Replace('/', '\\');
+    LogDebug($"[DEBUG] Chemin dossier demandé : {chemin}");
+    try
+    {
+        System.Diagnostics.Process.Start("explorer.exe", chemin);
+    }
+    catch (Exception ex)
+    {
+        LogDebug($"Erreur ouverture explorateur : {ex.Message}");
+    }
+#endif
+
 
                     UpdateWindowsActions();
                 }
@@ -996,12 +1027,16 @@ namespace StlExplorerClient
         private void OnOuvrirExplorateurClicked(object sender, EventArgs e)
         {
 #if WINDOWS
-            if (_modeleCourant == null || string.IsNullOrWhiteSpace(_modeleCourant.CheminDossier)) return;
-            try
-            {
-                System.Diagnostics.Process.Start("explorer.exe", _modeleCourant.CheminDossier);
-            }
-            catch { /* Ignorer si l'ouverture échoue */ }
+    if (_modeleCourant == null || string.IsNullOrWhiteSpace(_modeleCourant.CheminDossier)) return;
+
+    var chemin = AdapterCheminPourWindows(_modeleCourant.CheminDossier);
+    LogDebug($"[DEBUG] Chemin dossier demandé : {chemin}");
+
+    try
+    {
+        System.Diagnostics.Process.Start("explorer.exe", chemin);
+    }
+    catch { /* Ignorer si l'ouverture échoue */ }
 #endif
         }
 

@@ -5,7 +5,7 @@ namespace StlExplorerClient
     public partial class ConfigPage : ContentPage
     {
         public const string ServerUrlKey = "ServerUrl";
-        public const string DefaultServerUrl = "http://localhost:5182";
+        public const string DefaultServerUrl = "http://localhost:5180";
 
         private readonly HttpClient? _httpClient;
         private List<string> _dossiers = new();
@@ -179,13 +179,18 @@ namespace StlExplorerClient
                 StatusLabel.TextColor = Color.FromArgb("#E0E0E0");
                 StatusLabel.Text = "Synchronisation intelligente en cours...";
 
-                var response = await _httpClient.PostAsync("/api/Metadata/syncSmart", null);
+                var response = await _httpClient.PostAsync("/api/Metadata/sync-intelligent", null);
 
                 if (response.IsSuccessStatusCode)
                 {
                     StatusLabel.TextColor = Color.FromArgb("#4CAF50");
                     StatusLabel.Text = "Synchronisation intelligente lancée en tâche de fond.";
                 }
+               else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+               {
+                   StatusLabel.TextColor = Color.FromArgb("#FFB74D");
+                   StatusLabel.Text = "ℹ Un scan est déjà en cours. Patientez...";
+               }
                 else
                 {
                     var erreur = await response.Content.ReadAsStringAsync();

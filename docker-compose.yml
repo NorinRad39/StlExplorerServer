@@ -1,16 +1,19 @@
 services:
   # ── Base de données MariaDB ──
+  # network_mode: host → le conteneur partage directement le réseau du NAS.
+  # Contournement obligatoire sur Synology DS923+ où le bridge Docker inter-conteneurs
+  # est cassé (DNS résolu mais TCP bloqué).
   mariadb:
     image: mariadb:10.11
     container_name: stlexplorer-mariadb
     restart: unless-stopped
+    network_mode: host
     environment:
-      MYSQL_ROOT_PASSWORD: "RootP@ss2026!"
+      MYSQL_ROOT_PASSWORD: "Zoro!Magnus!39"
       MYSQL_DATABASE: "StlExplorerServer"
-      MYSQL_USER: "stluser"
-      MYSQL_PASSWORD: "StlP@ss2026!"
-    ports:
-      - "3307:3306"
+      MYSQL_USER: "florent"
+      MYSQL_PASSWORD: "Zoro!Magnus!39"
+      MYSQL_TCP_PORT: "3307"
     volumes:
       - mariadb_data:/var/lib/mysql
     healthcheck:
@@ -21,28 +24,33 @@ services:
       retries: 10
 
   # ── API StlExplorer ──
-  # Pour reconstruire l'image localement : docker build -t stlexplorer-api -f StlExplorerServer/Dockerfile .
+  # Pour reconstruire l'image localement (depuis la racine de la solution) :
+  #   docker-compose build
+  # Pour déployer sur le NAS : sauvegarder avec docker save, transférer, docker load, puis docker-compose up -d --no-build
   stlexplorer-api:
-    image: stlexplorer-api:latest
+    build:
+      context: .
+      dockerfile: StlExplorerServer/Dockerfile
+    image: stlexplorer-server:latest
     container_name: stlexplorer-api
     restart: unless-stopped
+    network_mode: host
     depends_on:
       mariadb:
         condition: service_healthy
-    ports:
-      - "5182:8080"
     environment:
-      # Connexion à MariaDB (le nom 'mariadb' est résolu par Docker Compose)
-      ConnectionStrings__DefaultConnection: "Server=mariadb;Port=3306;Database=StlExplorerServer;User=stluser;Password=StlP@ss2026!;"
-      # Dossiers racines à scanner (chemin tel que vu dans le conteneur)
+      # En mode host, les deux conteneurs partagent le réseau du NAS.
+      # MariaDB écoute sur 127.0.0.1:3307 (MYSQL_TCP_PORT=3307).
+      ConnectionStrings__DefaultConnection: "Server=127.0.0.1;Port=3307;Database=StlExplorerServer;User=florent;Password=Zoro!Magnus!39;Connect Timeout=60;"
       ScannerSettings__RootDirectories__0: "/data/3D_Maquettes"
-      # Désactiver HTTPS dans le conteneur
-      ASPNETCORE_URLS: "http://+:8080"
+      # En mode host, pas de mapping de ports : l'API écoute directement sur le port 5180 du NAS.
+      ASPNETCORE_URLS: "http://+:5180"
     volumes:
-      # Monter le partage NAS dans le conteneur
-      # À gauche : chemin réel sur le NAS Synology (ex: /volume1/Maquette/3D_Maquettes)
-      # À droite : chemin dans le conteneur (doit correspondre à ScannerSettings ci-dessus)
       - /volume1/Maquette/3D_Maquettes:/data/3D_Maquettes:rw
+      - stlexplorer_config:/app/config
 
 volumes:
   mariadb_data:
+    driver: local
+  stlexplorer_config:
+    driver: local

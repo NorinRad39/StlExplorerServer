@@ -2,6 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.EntityFrameworkCore;
+using StlExplorerServer.Data;
 
 namespace StlExplorerServer.Services
 {
@@ -44,6 +46,20 @@ namespace StlExplorerServer.Services
             ? FolderScannerService.ProgressionScanStatique
             : _progressionScan;
 
+        /// <summary>
+        /// Phase courante du scan ("Création de la base" ou "Mise à jour de la base").
+        /// </summary>
+        public string PhaseOperation => _scanEnCours
+            ? FolderScannerService.PhaseStatique
+            : string.Empty;
+
+       /// <summary>
+       /// Nombre de secondes écoulées depuis le début du scan.
+       /// </summary>
+       public double ElapsedSeconds => _scanEnCours
+           ? FolderScannerService.ElapsedSecondsStatique
+           : 0;
+
         public BackgroundScannerHostedService(
             IServiceScopeFactory scopeFactory,
             IConfiguration configuration,
@@ -58,8 +74,9 @@ namespace StlExplorerServer.Services
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            // Attendre que l'application soit complètement démarrée
-            await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+            // Appliquer les migrations EF Core AVANT le scan pour éviter les erreurs
+            // "Unknown column" si le schéma n'est pas encore à jour.
+            await AppliquerMigrationsAsync(stoppingToken);
 
             // Scan initial au démarrage si des dossiers sont configurés
             var rootDirs = _configuration.GetSection("ScannerSettings:RootDirectories").Get<string[]>();
@@ -84,6 +101,42 @@ namespace StlExplorerServer.Services
             catch (OperationCanceledException) { /* Arrêt normal */ }
 
             ArreterSurveillance();
+        }
+
+        /// <summary>
+        /// Applique les migrations EF Core avec retry, garantissant que le schéma de la base
+        /// est à jour avant tout scan. Remplace l'ancien Task.Run fire-and-forget de Program.cs.
+        /// </summary>
+        private async Task AppliquerMigrationsAsync(CancellationToken stoppingToken)
+        {
+            const int maxRetries = 15;
+            for (int i = 0; i < maxRetries; i++)
+            {
+                stoppingToken.ThrowIfCancellationRequested();
+                try
+                {
+                    using var scope = _scopeFactory.CreateScope();
+                    var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+                    await db.Database.MigrateAsync(stoppingToken);
+                    _logger.LogInformation("Migrations appliquées avec succès.");
+                    return;
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(
+                        "Tentative {Attempt}/{MaxRetries} — MariaDB pas encore prêt : {Message}",
+                        i + 1, maxRetries, ex.Message);
+                    if (i == maxRetries - 1)
+                    {
+                        _logger.LogCritical(
+                            "Impossible de se connecter à MariaDB après {MaxRetries} tentatives. Le scan ne sera pas lancé.",
+                            maxRetries);
+                        return;
+                    }
+                    await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+                }
+            }
         }
 
         #endregion

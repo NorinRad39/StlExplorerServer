@@ -28,4 +28,9 @@ RUN dotnet publish "./StlExplorerServer.csproj" -c $BUILD_CONFIGURATION -o /app/
 FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
+# Créer le répertoire de configuration modifiable (volume Docker)
+# avec les permissions de l'utilisateur non-root de l'application
+USER root
+RUN mkdir -p /app/config && chown $APP_UID:0 /app/config
+USER $APP_UID
 ENTRYPOINT ["dotnet", "StlExplorerServer.dll"]

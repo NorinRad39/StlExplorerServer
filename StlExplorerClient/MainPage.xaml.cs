@@ -4,6 +4,11 @@ using ClassLibStlExploServ;
 
 namespace StlExplorerClient
 {
+    // DTOs pour le statut et la progression du scan
+    file record ScanStatusDto(bool ScanEnCours);
+    file record ScanProgressDto(int Progression, string Phase, int ElapsedSeconds);
+   file record ScanLogDto(List<string> Entries, int TotalCount);
+
     public partial class MainPage : ContentPage
     {
         private List<ModeleResume> _allModeles = new();
@@ -16,6 +21,10 @@ namespace StlExplorerClient
         private bool _viewer3DVisible;
 
         private bool _dataLoaded;
+        private CancellationTokenSource? _scanPollCts;
+       private int _lastScanLogIndex;
+       private readonly List<string> _debugLogs = new();
+       private const int MaxDebugLogEntries = 200;
 
         public MainPage()
         {
@@ -27,6 +36,52 @@ namespace StlExplorerClient
 
             Loaded += OnPageLoaded;
         }
+
+       /// <summary>
+       /// Ajoute une entrée horodatée dans le journal de debug visible par l'utilisateur.
+       /// </summary>
+       private void LogDebug(string message)
+       {
+           var entry = $"[{DateTime.Now:HH:mm:ss}] {message}";
+           _debugLogs.Add(entry);
+           if (_debugLogs.Count > MaxDebugLogEntries)
+               _debugLogs.RemoveAt(0);
+           MainThread.BeginInvokeOnMainThread(() =>
+           {
+               DebugLogLabel.Text = string.Join("\n", _debugLogs);
+               _ = DebugLogScrollView.ScrollToAsync(0, double.MaxValue, false);
+           });
+       }
+
+       private void OnToggleDebugLogClicked(object? sender, EventArgs e)
+       {
+           DebugLogScrollView.IsVisible = !DebugLogScrollView.IsVisible;
+           BtnToggleDebugLog.Text = DebugLogScrollView.IsVisible ? "▲" : "▼";
+       }
+
+       private void OnClearDebugLogClicked(object sender, EventArgs e)
+       {
+           _debugLogs.Clear();
+           DebugLogLabel.Text = "";
+       }
+
+       /// <summary>
+       /// Calcule le temps restant estimé du scan à partir du pourcentage et du temps écoulé.
+       /// </summary>
+       private static string CalculerEta(int pourcentage, int elapsedSeconds)
+       {
+           if (pourcentage <= 0 || elapsedSeconds <= 3)
+               return "estimation...";
+
+           double totalEstime = elapsedSeconds / (pourcentage / 100.0);
+           double restant = totalEstime - elapsedSeconds;
+
+           if (restant < 5) return "< 5s";
+           if (restant < 60) return $"~{(int)restant}s restant";
+           int minutes = (int)(restant / 60);
+           int secondes = (int)(restant % 60);
+           return $"~{minutes}m {secondes:D2}s restant";
+       }
 
         private async void OnPageLoaded(object? sender, EventArgs e)
         {
@@ -41,44 +96,245 @@ namespace StlExplorerClient
         {
             try 
             {
-                var handler = new HttpClientHandler();
+                var handler = new HttpClientHandler
+                {
+                    // Désactiver le proxy système pour éviter les timeouts sur le réseau local/NAS
+                    UseProxy = false
+                };
 
                 // Lire l'URL du serveur depuis les préférences (configurable dans la page Config)
                 var defaultUrl =
 #if ANDROID
-                    "http://10.0.2.2:5182";
+                    "http://10.0.2.2:5180";
 #else
-                    "http://localhost:5182";
+                    "http://localhost:5180";
 #endif
                 var serverUrl = Preferences.Get(ConfigPage.ServerUrlKey, defaultUrl).TrimEnd('/');
 
 #if ANDROID
                 handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
 #endif
-                _httpClient = new HttpClient(handler) { BaseAddress = new Uri(serverUrl + "/") };
-                // Endpoint léger : projection SQL sans les CheminsImages
-                var response = await _httpClient.GetFromJsonAsync<List<ModeleResume>>("/api/Metadata/modelesResume");
-                if (response != null)
+                _httpClient = new HttpClient(handler)
                 {
-                    _allModeles = response;
-                    UpdateFamilles();
-                    UpdateSujets();
-                    UpdateModeles();
-                }
+                    BaseAddress = new Uri(serverUrl + "/"),
+                    Timeout = TimeSpan.FromSeconds(30) // Timeout global raisonnable
+                };
+                LogDebug($"Connexion au serveur : {serverUrl}");
+
+                // Démarrer le polling immédiatement (avant le chargement des données)
+                // pour que la barre de progression s'affiche dès que possible.
+                if (_scanPollCts == null)
+                    DemarrerPollingStatutScan();
+
+                // Charger les modèles avec retry si le serveur est occupé (scan en cours au démarrage)
+                await ChargerModelesAvecRetryAsync();
             }
             catch (Exception ex)
             {
+                LogDebug($"❌ Erreur connexion serveur : {ex.Message}");
                 try
                 {
                     await DisplayAlert("Erreur", "Impossible de contacter le serveur : " + ex.Message, "OK");
                 }
                 catch
                 {
-                    // WinUI peut échouer si la page n'est pas encore dans l'arbre visuel
                     System.Diagnostics.Debug.WriteLine($"Erreur serveur : {ex.Message}");
                 }
             }
         }
+
+        /// <summary>
+        /// Charge la liste des modèles avec un mécanisme de retry automatique.
+        /// Si le serveur est occupé par un scan, arrête les tentatives et laisse
+        /// le polling recharger les modèles automatiquement à la fin du scan.
+        /// </summary>
+        private async Task ChargerModelesAvecRetryAsync()
+        {
+            if (_httpClient == null) return;
+
+            const int maxRetries = 6;  // 6 × 5s = 30s max d'attente
+            for (int tentative = 1; tentative <= maxRetries; tentative++)
+            {
+                // Vérifier d'abord si un scan est en cours (endpoint léger, pas de DB)
+                try
+                {
+                    using var statusCts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                    var status = await _httpClient.GetFromJsonAsync<ScanStatusDto>(
+                        "/api/Metadata/scan-status", statusCts.Token);
+
+                    if (status?.ScanEnCours == true)
+                    {
+                        LogDebug("⏳ Scan en cours — chargement des modèles reporté (automatique à la fin du scan).");
+                        return; // Le polling appellera RafraichirModelesAsync() quand le scan se termine
+                    }
+                }
+                catch { /* scan-status indisponible, on tente le chargement quand même */ }
+
+                // Pas de scan en cours → tenter de charger les modèles
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                    var response = await _httpClient.GetFromJsonAsync<List<ModeleResume>>(
+                        "/api/Metadata/modelesResume", cts.Token);
+
+                    if (response != null)
+                    {
+                        _allModeles = response;
+                        LogDebug($"✅ {response.Count} modèle(s) chargé(s)");
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                        {
+                            UpdateFamilles();
+                            UpdateSujets();
+                            UpdateModeles();
+                        });
+                        return; // Succès → on sort
+                    }
+                    else
+                    {
+                        LogDebug("⚠ Réponse vide du serveur (aucun modèle).");
+                        return;
+                    }
+                }
+                catch (Exception ex) when (tentative < maxRetries)
+                {
+                    LogDebug($"⏳ Tentative {tentative}/{maxRetries} — serveur pas prêt : {ex.Message}");
+                    await Task.Delay(TimeSpan.FromSeconds(5));
+                }
+            }
+
+            LogDebug("❌ Impossible de charger les modèles après plusieurs tentatives.");
+        }
+
+        /// <summary>
+        /// Recharge uniquement la liste des modèles sans réinitialiser le client HTTP.
+        /// Utilisé après la fin d'un scan pour mettre à jour l'interface.
+        /// </summary>
+        private async Task RafraichirModelesAsync()
+        {
+            if (_httpClient == null) return;
+            try
+            {
+                var response = await _httpClient.GetFromJsonAsync<List<ModeleResume>>("/api/Metadata/modelesResume");
+                if (response != null)
+                {
+                    _allModeles = response;
+                   LogDebug($"🔄 Modèles rafraîchis : {response.Count} modèle(s)");
+                    await MainThread.InvokeOnMainThreadAsync(() =>
+                    {
+                        UpdateFamilles();
+                        UpdateSujets();
+                        UpdateModeles();
+                    });
+                }
+            }
+           catch (Exception ex)
+           {
+               LogDebug($"❌ Erreur rafraîchissement modèles : {ex.Message}");
+           }
+        }
+
+        /// <summary>
+        /// Démarre le polling toutes les 2 secondes pour surveiller l'état du scan.
+        /// </summary>
+        private void DemarrerPollingStatutScan()
+        {
+            _scanPollCts = new CancellationTokenSource();
+            _ = PollScanStatutAsync(_scanPollCts.Token);
+        }
+
+        private async Task PollScanStatutAsync(CancellationToken token)
+        {
+            bool dernierEtatScanEnCours = false;
+           LogDebug("📡 Polling du statut de scan démarré (toutes les 2s)");
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(2));
+            while (!token.IsCancellationRequested)
+            {
+                try
+                {
+                    await timer.WaitForNextTickAsync(token);
+                    if (_httpClient == null) continue;
+
+                    var status = await _httpClient.GetFromJsonAsync<ScanStatusDto>(
+                        "/api/Metadata/scan-status", token);
+                    bool scanEnCours = status?.ScanEnCours ?? false;
+
+                    if (scanEnCours)
+                    {
+                        var progress = await _httpClient.GetFromJsonAsync<ScanProgressDto>(
+                            "/api/Metadata/scan-progress", token);
+                        int pct = progress?.Progression ?? 0;
+                        int elapsed = progress?.ElapsedSeconds ?? 0;
+                        string phase = string.IsNullOrWhiteSpace(progress?.Phase)
+                            ? "Scan en cours..."
+                            : progress.Phase;
+                        string eta = CalculerEta(pct, elapsed);
+
+                       if (!dernierEtatScanEnCours)
+                       {
+                           LogDebug($"🔍 Scan détecté : {phase}");
+                           _lastScanLogIndex = 0; // Réinitialiser pour récupérer tout le log du nouveau scan
+                       }
+
+                        // Récupérer les nouvelles entrées du journal de scan serveur
+                        try
+                        {
+                            var scanLog = await _httpClient.GetFromJsonAsync<ScanLogDto>(
+                                $"/api/Metadata/scan-log?fromIndex={_lastScanLogIndex}", token);
+                            if (scanLog?.Entries != null)
+                            {
+                                foreach (var entry in scanLog.Entries)
+                                    LogDebug($"📋 {entry}");
+                                _lastScanLogIndex = scanLog.TotalCount;
+                            }
+                        }
+                        catch { /* Le scan-log est optionnel, on continue si ça échoue */ }
+
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                        {
+                            ScanProgressPanel.IsVisible = true;
+                            ScanProgressBar.Progress = pct / 100.0;
+                            ScanPercentLabel.Text = $"{pct}%";
+                            ScanPhaseLabel.Text = phase;
+                            ScanEtaLabel.Text = eta;
+                        });
+                    }
+                    else
+                    {
+                        await MainThread.InvokeOnMainThreadAsync(() =>
+                            ScanProgressPanel.IsVisible = false);
+
+                        // Le scan vient de se terminer → récupérer les dernières entrées du log
+                        if (dernierEtatScanEnCours)
+                       {
+                            try
+                            {
+                                var scanLog = await _httpClient.GetFromJsonAsync<ScanLogDto>(
+                                    $"/api/Metadata/scan-log?fromIndex={_lastScanLogIndex}", token);
+                                if (scanLog?.Entries != null)
+                                {
+                                    foreach (var entry in scanLog.Entries)
+                                        LogDebug($"📋 {entry}");
+                                    _lastScanLogIndex = scanLog.TotalCount;
+                                }
+                            }
+                            catch { /* optionnel */ }
+
+                           LogDebug("✅ Scan terminé — rechargement des modèles...");
+                            await RafraichirModelesAsync();
+                       }
+                    }
+
+                    dernierEtatScanEnCours = scanEnCours;
+                }
+                catch (OperationCanceledException) { break; }
+               catch (Exception ex)
+               {
+                   LogDebug($"⚠ Erreur polling : {ex.Message}");
+               }
+            }
+        }
+
+
 
         private void ClearChildEntries(params Entry[] entries)
         {
@@ -767,20 +1023,32 @@ namespace StlExplorerClient
             try
             {
                 BtnActualiserBase.IsEnabled = false;
+               LogDebug("🔄 Demande d'actualisation de la base...");
                 var response = await _httpClient.PostAsync("/api/Metadata/refreshAll", null);
                 if (response.IsSuccessStatusCode)
                 {
-                    await DisplayAlert("Succès", "La base de données a été actualisée.", "OK");
-                    await LoadDataAsync(); // Recharge les données après actualisation
+                   LogDebug("✅ Synchronisation lancée en tâche de fond.");
+                   await DisplayAlert("Succès",
+                       "Synchronisation lancée en tâche de fond.\nLa barre de progression s'affichera automatiquement.",
+                       "OK");
+               }
+               else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
+               {
+                   LogDebug("ℹ Un scan est déjà en cours.");
+                   await DisplayAlert("Info",
+                       "Un scan est déjà en cours. Patientez, la barre de progression affiche l'avancement.",
+                       "OK");
                 }
                 else
                 {
                     var erreur = await response.Content.ReadAsStringAsync();
+                   LogDebug($"❌ Erreur serveur ({(int)response.StatusCode}) : {erreur}");
                     await DisplayAlert("Erreur", $"Le serveur a répondu : {erreur}", "OK");
                 }
             }
             catch (Exception ex)
             {
+               LogDebug($"❌ Erreur réseau : {ex.Message}");
                 await DisplayAlert("Erreur", "Impossible d'actualiser la base : " + ex.Message, "OK");
             }
             finally

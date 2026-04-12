@@ -40,6 +40,7 @@ namespace StlExplorerServer.Services
                 logger.LogInformation("Début du scan pour le chemin : {Path}", path);
 
                 var modeleDirectories = GetModeleDirectories(new DirectoryInfo(path)).ToList();
+                AjouterLogScan($"🔍 Scan de {path} — {modeleDirectories.Count} dossier(s) modèle détecté(s)");
                 int total = modeleDirectories.Count;
                 int current = 0;
                 foreach (var directory in modeleDirectories)
@@ -122,17 +123,22 @@ namespace StlExplorerServer.Services
             if (rootDirs == null || rootDirs.Length == 0)
             {
                 logger.LogWarning("Aucun dossier racine configuré dans appsettings.json.");
+                AjouterLogScan("⚠ Aucun dossier racine configuré.");
                 return;
             }
 
             // Récupérer tous les chemins de modèles connus en base
             var cheminsModelesEnBase = new HashSet<string>(metadataRepository.GetAllModelesChemins(), StringComparer.OrdinalIgnoreCase);
+            ReinitialiserLogScan();
+           lock (_progressionLock) { _scanStartTime = DateTime.UtcNow; }
+            AjouterLogScan($"🚀 Synchronisation intelligente — {rootDirs.Length} dossier(s) racine(s)");
 
             foreach (var dir in rootDirs)
             {
                 if (!Directory.Exists(dir))
                 {
                     logger.LogWarning("Dossier racine inexistant : {Dir}", dir);
+                    AjouterLogScan($"⚠ Dossier inexistant : {dir}");
                     continue;
                 }
 
@@ -141,14 +147,20 @@ namespace StlExplorerServer.Services
                 if (isNouveau)
                 {
                     logger.LogInformation("Nouveau dossier racine détecté, scan complet : {Dir}", dir);
+                    lock (_progressionLock) { _phaseOperation = "Création de la base"; }
+                    AjouterLogScan($"📂 Nouveau dossier racine → scan complet : {dir}");
                     ScanFolder(dir);
                 }
                 else
                 {
                     logger.LogInformation("Mise à jour du dossier racine existant : {Dir}", dir);
+                    lock (_progressionLock) { _phaseOperation = "Mise à jour de la base"; }
+                    AjouterLogScan($"📂 Mise à jour du dossier existant : {dir}");
                     ActualiserBaseDepuisDossier(dir);
                 }
+                lock (_progressionLock) { _phaseOperation = string.Empty; }
             }
+            AjouterLogScan("✅ Synchronisation terminée.");
         }
 
         /// <summary>
@@ -192,6 +204,7 @@ namespace StlExplorerServer.Services
                 if (!cheminsModelesDisque.Contains(modele.CheminDossier))
                 {
                     logger.LogInformation("Suppression du modèle absent du disque : {Chemin}", modele.CheminDossier);
+                    AjouterLogScan($"🗑 Supprimé (absent du disque) : {modele.Description}");
                     metadataRepository.DeleteModele(modele.ModeleID);
                 }
             }
@@ -330,6 +343,7 @@ namespace StlExplorerServer.Services
                 // Mise à jour des images au cas où de nouvelles ont été ajoutées
                 existingModele.CheminsImages = imageFiles;
                 metadataRepository.UpdateModele(existingModele);
+                AjouterLogScan($"🔄 {directory.Parent?.Parent?.Name} > {directory.Parent?.Name} > {directory.Name} ({imageFiles.Count} img)");
                 return existingModele;
             }
 
@@ -344,6 +358,7 @@ namespace StlExplorerServer.Services
 
             // On sauvegarde le modèle (l'appel à SaveModele a été déplacé ici)
             metadataRepository.SaveModele(modele);
+            AjouterLogScan($"✨ NOUVEAU : {directory.Parent?.Parent?.Name} > {directory.Parent?.Name} > {directory.Name} ({imageFiles.Count} img)");
             return modele;
         }
 
@@ -354,6 +369,13 @@ namespace StlExplorerServer.Services
         private static readonly object _cacheLock = new();
         private static readonly object _progressionLock = new();
         private static int _progressionScan = 0;
+        private static string _phaseOperation = string.Empty;
+       private static DateTime _scanStartTime = DateTime.MinValue;
+
+       // Journal de scan (accessible via l'endpoint /api/Metadata/scan-log)
+       private static readonly List<string> _scanLog = new();
+       private static readonly object _scanLogLock = new();
+       private const int MaxScanLogEntries = 500;
 
         /// <summary>
         /// Pourcentage d'avancement du scan, accessible en lecture statique
@@ -363,6 +385,66 @@ namespace StlExplorerServer.Services
         {
             get { lock (_progressionLock) { return _progressionScan; } }
         }
+
+        /// <summary>
+        /// Phase courante du scan ("Création de la base" ou "Mise à jour de la base").
+        /// </summary>
+        internal static string PhaseStatique
+        {
+            get { lock (_progressionLock) { return _phaseOperation; } }
+        }
+
+       /// <summary>
+       /// Nombre de secondes écoulées depuis le début du scan en cours.
+       /// Retourne 0 si aucun scan n'est en cours.
+       /// </summary>
+       internal static double ElapsedSecondsStatique
+       {
+           get
+           {
+               lock (_progressionLock)
+               {
+                   if (_scanStartTime == DateTime.MinValue) return 0;
+                   return (DateTime.UtcNow - _scanStartTime).TotalSeconds;
+               }
+           }
+       }
+
+       /// <summary>
+       /// Retourne les entrées du journal de scan à partir d'un index donné.
+       /// Permet au client de ne récupérer que les nouvelles entrées.
+       /// </summary>
+       internal static List<string> GetScanLogDepuis(int fromIndex)
+       {
+           lock (_scanLogLock)
+           {
+               if (fromIndex >= _scanLog.Count) return new List<string>();
+               return _scanLog.Skip(fromIndex).ToList();
+           }
+       }
+
+       /// <summary>Nombre total d'entrées dans le journal de scan.</summary>
+       internal static int ScanLogCount
+       {
+           get { lock (_scanLogLock) { return _scanLog.Count; } }
+       }
+
+       /// <summary>Ajoute une entrée horodatée dans le journal de scan.</summary>
+       private static void AjouterLogScan(string message)
+       {
+           lock (_scanLogLock)
+           {
+               _scanLog.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
+               if (_scanLog.Count > MaxScanLogEntries)
+                   _scanLog.RemoveRange(0, _scanLog.Count - MaxScanLogEntries);
+           }
+       }
+
+       /// <summary>Vide le journal de scan (appelé au début de chaque synchronisation).</summary>
+       internal static void ReinitialiserLogScan()
+       {
+           lock (_scanLogLock) { _scanLog.Clear(); }
+       }
     }
 
     #endregion

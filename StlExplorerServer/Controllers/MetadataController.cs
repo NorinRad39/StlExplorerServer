@@ -313,12 +313,32 @@ namespace StlExplorerServer.Controllers
         }
 
         /// <summary>
-        /// Récupère le pourcentage d'avancement du scan en cours.
+        /// Récupère le pourcentage d'avancement et la phase du scan en cours.
         /// </summary>
         [HttpGet("scan-progress")]
         public IActionResult GetScanProgress()
         {
-            return Ok(new { progression = backgroundScanner.ProgressionScan });
+            return Ok(new
+            {
+                progression = backgroundScanner.ProgressionScan,
+                phase = backgroundScanner.PhaseOperation,
+                elapsedSeconds = (int)backgroundScanner.ElapsedSeconds
+            });
+        }
+
+        /// <summary>
+        /// Récupère les entrées du journal de scan depuis un index donné.
+        /// Permet au client de ne récupérer que les nouvelles entrées (pagination incrémentale).
+        /// </summary>
+        [HttpGet("scan-log")]
+        public IActionResult GetScanLog([FromQuery] int fromIndex = 0)
+        {
+            var entries = FolderScannerService.GetScanLogDepuis(fromIndex);
+            return Ok(new
+            {
+                entries,
+                totalCount = FolderScannerService.ScanLogCount
+            });
         }
 
         #endregion
@@ -512,17 +532,26 @@ namespace StlExplorerServer.Controllers
         }
 
         /// <summary>
-        /// Met à jour la liste des dossiers racines dans appsettings.json.
+        /// Met à jour la liste des dossiers racines dans le fichier de configuration modifiable (override.json).
+        /// Compatible Docker : n'écrit jamais dans appsettings.json (lecture seule dans le container).
         /// </summary>
         [HttpPut("configuration/rootDirectories")]
-        public IActionResult SetRootDirectories([FromBody] string[] directories)
+        public IActionResult SetRootDirectories(
+            [FromBody] string[] directories,
+            [FromServices] Microsoft.Extensions.Configuration.IConfiguration configuration)
         {
             try
             {
-                var appSettingsPath = System.IO.Path.Combine(
-                    System.IO.Directory.GetCurrentDirectory(), "appsettings.json");
-                var json = System.IO.File.ReadAllText(appSettingsPath);
-                var jsonNode = System.Text.Json.Nodes.JsonNode.Parse(json)!;
+                var overrideDir = System.IO.Path.Combine(System.IO.Directory.GetCurrentDirectory(), "config");
+                System.IO.Directory.CreateDirectory(overrideDir);
+                var overridePath = System.IO.Path.Combine(overrideDir, "override.json");
+
+                var json = System.IO.File.Exists(overridePath) ? System.IO.File.ReadAllText(overridePath) : "{}";
+                var jsonNode = System.Text.Json.Nodes.JsonNode.Parse(json)
+                    ?? new System.Text.Json.Nodes.JsonObject();
+
+                if (jsonNode["ScannerSettings"] == null)
+                    jsonNode["ScannerSettings"] = new System.Text.Json.Nodes.JsonObject();
 
                 var arrayNode = new System.Text.Json.Nodes.JsonArray();
                 foreach (var dir in directories)
@@ -531,7 +560,12 @@ namespace StlExplorerServer.Controllers
                 jsonNode["ScannerSettings"]!["RootDirectories"] = arrayNode;
 
                 var options = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-                System.IO.File.WriteAllText(appSettingsPath, jsonNode.ToJsonString(options));
+                System.IO.File.WriteAllText(overridePath, jsonNode.ToJsonString(options));
+
+                // Recharger IConfiguration pour que BackgroundScannerHostedService et les autres
+                // services voient immédiatement les nouveaux chemins sans redémarrage.
+                if (configuration is Microsoft.Extensions.Configuration.IConfigurationRoot configRoot)
+                    configRoot.Reload();
 
                 logger.LogInformation(
                     "Configuration des dossiers racines mise à jour : {Count} dossier(s)", directories.Length);

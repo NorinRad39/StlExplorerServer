@@ -9,8 +9,51 @@
     </ContentPage.ToolbarItems>
 
     <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+           <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- Bannière de progression du scan (visible uniquement pendant un scan) -->
+        <Border x:Name="ScanProgressPanel"
+                Grid.Row="0"
+                IsVisible="False"
+                BackgroundColor="#1A3A5C"
+                StrokeThickness="0"
+                Padding="15,10">
+            <Grid ColumnDefinitions="*, Auto" ColumnSpacing="15">
+                <VerticalStackLayout Grid.Column="0" Spacing="5" VerticalOptions="Center">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <Label x:Name="ScanPhaseLabel"
+                               Grid.Column="0"
+                               Text="Scan en cours..."
+                               TextColor="#90CAF9"
+                               FontSize="13"
+                               FontAttributes="Bold" />
+                        <Label x:Name="ScanEtaLabel"
+                               Grid.Column="1"
+                               Text=""
+                               TextColor="#78909C"
+                               FontSize="12"
+                               VerticalOptions="Center" />
+                    </Grid>
+                    <ProgressBar x:Name="ScanProgressBar"
+                                 Progress="0"
+                                 ProgressColor="#2196F3" />
+                </VerticalStackLayout>
+                <Label x:Name="ScanPercentLabel"
+                       Grid.Column="1"
+                       Text="0%"
+                       TextColor="White"
+                       FontSize="22"
+                       FontAttributes="Bold"
+                       VerticalOptions="Center" />
+            </Grid>
+        </Border>
+
         <!-- Contenu principal -->
-        <ScrollView>
+        <ScrollView Grid.Row="1">
             <VerticalStackLayout
                 Padding="30"
                 Spacing="20">
@@ -237,8 +280,62 @@
             </VerticalStackLayout>
         </ScrollView>
 
+        <!-- Panneau de log de debug (repliable) -->
+        <Border x:Name="DebugLogPanel"
+                Grid.Row="2"
+                Stroke="#444"
+                StrokeThickness="1"
+                BackgroundColor="#1A1A2E"
+                Padding="0">
+            <VerticalStackLayout>
+                <Grid Padding="10,6" BackgroundColor="#252542">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Label Text="🐛 Journal de debug"
+                           TextColor="#FFB74D"
+                           FontSize="13"
+                           FontAttributes="Bold"
+                           VerticalOptions="Center">
+                        <Label.GestureRecognizers>
+                            <TapGestureRecognizer Tapped="OnToggleDebugLogClicked" />
+                        </Label.GestureRecognizers>
+                    </Label>
+                    <Button x:Name="BtnClearDebugLog"
+                            Grid.Column="1"
+                            Text="🗑"
+                            FontSize="13"
+                            TextColor="#888"
+                            BackgroundColor="Transparent"
+                            Padding="8,0"
+                            Clicked="OnClearDebugLogClicked" />
+                    <Button x:Name="BtnToggleDebugLog"
+                            Grid.Column="2"
+                            Text="▼"
+                            FontSize="14"
+                            TextColor="#FFB74D"
+                            BackgroundColor="Transparent"
+                            Padding="8,0"
+                            Clicked="OnToggleDebugLogClicked" />
+                </Grid>
+                <ScrollView x:Name="DebugLogScrollView"
+                            HeightRequest="180"
+                            IsVisible="False">
+                    <Label x:Name="DebugLogLabel"
+                           Text=""
+                           TextColor="#A5D6A7"
+                           FontSize="11"
+                           FontFamily="Consolas"
+                           Padding="10,5"
+                           LineBreakMode="WordWrap" />
+                </ScrollView>
+            </VerticalStackLayout>
+        </Border>
+
         <!-- Overlay plein écran pour agrandir l'image (clic pour fermer) -->
-        <Grid x:Name="ImageOverlay" IsVisible="False" BackgroundColor="#DD000000" ZIndex="100">
+        <Grid x:Name="ImageOverlay" Grid.RowSpan="3" IsVisible="False" BackgroundColor="#DD000000" ZIndex="100">
             <Grid.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnImageOverlayTapped" />
             </Grid.GestureRecognizers>

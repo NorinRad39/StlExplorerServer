@@ -87,6 +87,20 @@ builder.Logging.AddDebug();       // Affiche les messages dans la fenêtre "Sorti
 
 #endregion
 
+#region Fichier de configuration modifiable (compatible Docker)
+
+// Le fichier appsettings.json est intégré dans l'image Docker et est en lecture seule.
+// On ajoute un fichier de surcharge modifiable dans un répertoire monté en volume (/app/config/).
+// Ce fichier a la priorité la plus haute dans la chaîne de configuration ASP.NET Core.
+var overrideConfigDir = Path.Combine(Directory.GetCurrentDirectory(), "config");
+Directory.CreateDirectory(overrideConfigDir);
+var overrideConfigPath = Path.Combine(overrideConfigDir, "override.json");
+if (!File.Exists(overrideConfigPath))
+    File.WriteAllText(overrideConfigPath, "{}");
+builder.Configuration.AddJsonFile(overrideConfigPath, optional: true, reloadOnChange: false);
+
+#endregion
+
 #region Construction et Configuration du Pipeline HTTP
 
 /// <summary>
@@ -95,27 +109,7 @@ builder.Logging.AddDebug();       // Affiche les messages dans la fenêtre "Sorti
 /// </summary>
 var app = builder.Build();
 
-// Appliquer automatiquement les migrations EF Core au démarrage (crée les tables si la base est vide)
-// Boucle de retry pour laisser le temps à MariaDB de démarrer dans Docker
-var maxRetries = 15;
-for (int i = 0; i < maxRetries; i++)
-{
-    try
-    {
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-        db.Database.Migrate();
-        app.Logger.LogInformation("Migrations appliquées avec succès.");
-        break;
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogWarning("Tentative {Attempt}/{MaxRetries} — MariaDB pas encore prêt : {Message}", i + 1, maxRetries, ex.Message);
-        if (i == maxRetries - 1)
-            throw; // Dernière tentative, on laisse l'exception remonter
-        Thread.Sleep(TimeSpan.FromSeconds(5));
-    }
-}
+// Les migrations EF Core seront gérées par BackgroundScannerHostedService à la place.
 
 /* 
  * PIPELINE MIDDLEWARES : 

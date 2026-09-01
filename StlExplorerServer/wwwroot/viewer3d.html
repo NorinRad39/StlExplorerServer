@@ -12,6 +12,49 @@ canvas { display: block; }
 </head>
 <body>
 <div id="info">Clic gauche = rotation · Clic droit = panoramique · Molette = zoom</div>
+<script>
+  // ------------------------------------------------------------------
+  // Remontee des erreurs vers le journal de debug de l'app (C#) via une
+  // fausse navigation interceptee par MainPage.xaml.cs (Viewer3DWebView.Navigating).
+  // Indispensable sur Android : sans ca, un echec (WebGL absent, CDN
+  // injoignable, module JS en erreur...) se traduit juste par un ecran
+  // vide, sans aucun indice.
+  // ------------------------------------------------------------------
+  function reportLog(message, fatal) {
+    try {
+      var prefixe = fatal ? 'FATAL:' : '';
+      window.location.href = 'stlviewerlog://' + encodeURIComponent(prefixe + message);
+    } catch (e) { /* navigation impossible : tant pis pour le log natif */ }
+
+    var info = document.getElementById('info');
+    if (info) {
+      info.textContent = message;
+      info.style.color = fatal ? '#ff6b6b' : '#ffb74d';
+    }
+  }
+
+  window.addEventListener('error', function (e) {
+    reportLog('Erreur script : ' + (e.message || e.error || 'inconnue'), true);
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var raison = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
+    reportLog('Promesse rejetee : ' + raison, true);
+  });
+
+  // ------------------------------------------------------------------
+  // File d'attente pour window.loadModel : sur mobile, le module Three.js
+  // (charge depuis un CDN, ~1,3 Mo) peut mettre plusieurs secondes a etre
+  // pret. Le client appelle loadModel() des que la page a fini de
+  // naviguer, sans attendre le module -> sans cette file, l'appel se
+  // perdrait silencieusement si le module n'est pas encore charge.
+  // ------------------------------------------------------------------
+  window.__pendingModel = null;
+  window.loadModel = function (url, extension) {
+    window.__pendingModel = { url: url, extension: extension };
+  };
+
+  reportLog('Chargement du visualiseur 3D...', false);
+</script>
 <script type="importmap">
 {
   "imports": {
@@ -30,7 +73,14 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2D2D2D);
 
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 100000);
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+} catch (e) {
+  reportLog('WebGL indisponible sur cet appareil : ' + e.message, true);
+  throw e;
+}
 renderer.setPixelRatio(window.devicePixelRatio);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
@@ -64,23 +114,37 @@ function centerAndFit(obj) {
 const mat = new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.25, roughness: 0.65 });
 
 window.loadModel = function(url, extension) {
+  reportLog('Chargement du modele...', false);
   clearMeshes();
   const ext = extension.toLowerCase();
+  const onError = function (err) {
+    reportLog('Chargement du fichier 3D echoue : ' + (err && err.message ? err.message : err), true);
+  };
   if (ext === '.stl') {
     new STLLoader().load(url, function(geometry) {
       geometry.computeVertexNormals();
       const mesh = new THREE.Mesh(geometry, mat);
       scene.add(mesh);
       centerAndFit(mesh);
-    });
+      reportLog('Clic gauche = rotation · Clic droit = panoramique · Molette = zoom', false);
+    }, undefined, onError);
   } else if (ext === '.obj') {
     new OBJLoader().load(url, function(group) {
       group.traverse(c => { if (c.isMesh) c.material = mat; });
       scene.add(group);
       centerAndFit(group);
-    });
+      reportLog('Clic gauche = rotation · Clic droit = panoramique · Molette = zoom', false);
+    }, undefined, onError);
   }
 };
+
+// Le module vient de finir de charger : rejouer une demande recue plus tot
+// (le client appelle loadModel() des la fin de la navigation, potentiellement
+// avant que ce module -- charge depuis un CDN -- ait fini de s'executer).
+if (window.__pendingModel) {
+  window.loadModel(window.__pendingModel.url, window.__pendingModel.extension);
+  window.__pendingModel = null;
+}
 
 (function animate() {
   requestAnimationFrame(animate);

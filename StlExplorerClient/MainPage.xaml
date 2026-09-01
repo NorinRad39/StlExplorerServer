@@ -131,6 +131,35 @@
                     </Border>
                 </Grid>
 
+                <!-- Défilement rapide des modèles du sujet (boutons ou flèches ◀ ▶ du clavier) -->
+                <HorizontalStackLayout x:Name="ModeleNavPanel" IsVisible="False" Spacing="12" HorizontalOptions="Start">
+                    <Button x:Name="BtnModelePrecedent"
+                            Text="&#x25C0; Modèle"
+                            FontSize="14"
+                            WidthRequest="120"
+                            HeightRequest="40"
+                            BackgroundColor="#37474F"
+                            TextColor="White"
+                            CornerRadius="5"
+                            ToolTipProperties.Text="Modèle précédent (flèche gauche du clavier)"
+                            Clicked="OnModelePrecedentClicked" />
+                    <Button x:Name="BtnModeleSuivant"
+                            Text="Modèle &#x25B6;"
+                            FontSize="14"
+                            WidthRequest="120"
+                            HeightRequest="40"
+                            BackgroundColor="#37474F"
+                            TextColor="White"
+                            CornerRadius="5"
+                            ToolTipProperties.Text="Modèle suivant (flèche droite du clavier)"
+                            Clicked="OnModeleSuivantClicked" />
+                    <Label x:Name="ModeleNavLabel"
+                           Text=""
+                           TextColor="#B0BEC5"
+                           FontSize="13"
+                           VerticalOptions="Center" />
+                </HorizontalStackLayout>
+
                 <!-- Zone d'actions (Windows uniquement) -->
                 <HorizontalStackLayout x:Name="WindowsActionsPanel" IsVisible="False" Spacing="10" HorizontalOptions="Start">
                     <Button x:Name="BtnCreerDossier" 
@@ -163,6 +192,17 @@
                             Padding="15,0"
                             IsVisible="False"
                             Clicked="OnRenommerModeleClicked" />
+                    <Button x:Name="BtnTeleverserDossier"
+                            Text="📦 Téléverser un dossier"
+                            BackgroundColor="#00695C"
+                            TextColor="White"
+                            FontSize="14"
+                            CornerRadius="5"
+                            HeightRequest="40"
+                            Padding="15,0"
+                            IsVisible="False"
+                            ToolTipProperties.Text="Copier un dossier déjà nommé (et tout son contenu) dans Famille &gt; Sujet"
+                            Clicked="OnTeleverserDossierClicked" />
                     <Button x:Name="BtnOuvrirExplorateur" 
                             Text="📂 Ouvrir le dossier" 
                             BackgroundColor="#6A1B9A"
@@ -184,6 +224,33 @@
                 HorizontalOptions="Start"
                 Clicked="OnActualiserBaseClicked" />
                 </HorizontalStackLayout>
+
+                <!-- Progression d'une copie de fichiers ou de dossier -->
+                <Border x:Name="UploadProgressPanel"
+                        IsVisible="False"
+                        Stroke="#555"
+                        StrokeThickness="1"
+                        BackgroundColor="#1A3A5C"
+                        Padding="15,10">
+                    <VerticalStackLayout Spacing="5">
+                        <Grid ColumnDefinitions="*, Auto">
+                            <Label x:Name="UploadPhaseLabel"
+                                   Grid.Column="0"
+                                   Text=""
+                                   TextColor="#90CAF9"
+                                   FontSize="13"
+                                   FontAttributes="Bold"
+                                   LineBreakMode="TailTruncation" />
+                            <Label x:Name="UploadPercentLabel"
+                                   Grid.Column="1"
+                                   Text=""
+                                   TextColor="#E0E0E0"
+                                   FontSize="13"
+                                   FontAttributes="Bold" />
+                        </Grid>
+                        <ProgressBar x:Name="UploadProgressBar" Progress="0" ProgressColor="#2196F3" />
+                    </VerticalStackLayout>
+                </Border>
 
                 <!-- Contenu du dossier (fichiers et sous-dossiers à la racine) -->
                 <Border x:Name="ContenuDossierPanel" IsVisible="False" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D" Padding="10">

@@ -361,3 +361,12 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# ============================================================
+# Releases generees par scripts/build-release.ps1
+# (APK Android, image Docker exportee) - a regenerer localement,
+# jamais a committer. publish/, bin/ et obj/ (deja ignores plus haut)
+# couvrent deja les sorties de build Windows (MSIX, exe, AppPackages).
+# ============================================================
+*.apk
+*.aab
+*.tar

@@ -258,6 +258,8 @@ namespace StlExplorerServer.Controllers
         /// Les images (jpg, png, etc.) sont automatiquement ajoutées à la liste CheminsImages du modèle.
         /// </summary>
         [HttpPost("uploadFichiers/{modeleId}")]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue, ValueCountLimit = int.MaxValue)]
         public async Task<IActionResult> UploadFichiers(
             int modeleId,
             [FromForm] List<IFormFile> fichiers,
@@ -299,6 +301,147 @@ namespace StlExplorerServer.Controllers
             catch (Exception ex)
             {
                 logger.LogError(ex, "Erreur lors de l'upload des fichiers.");
+                return StatusCode(500, $"Erreur interne : {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Téléverse un dossier complet (fichiers et sous-dossiers) dans le dossier d'un modèle existant.
+        /// Chaque fichier est accompagné de son chemin relatif à la racine du dossier téléversé
+        /// (champ de formulaire « cheminsRelatifs », envoyé dans le même ordre que les fichiers),
+        /// ce qui permet de recréer l'arborescence complète côté serveur.
+        /// </summary>
+        /// <remarks>
+        /// Le client envoie le dossier par lots pour éviter les requêtes trop volumineuses.
+        /// Les limites de taille par défaut d'ASP.NET Core (30 Mo) sont désactivées ici.
+        /// </remarks>
+        [HttpPost("uploadDossier/{modeleId}")]
+        [DisableRequestSizeLimit]
+        [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue, ValueCountLimit = int.MaxValue)]
+        public async Task<IActionResult> UploadDossier(
+            int modeleId,
+            [FromForm] List<IFormFile> fichiers,
+            [FromForm] List<string> cheminsRelatifs,
+            [FromServices] StlExplorerServer.Repositories.IMetadonneesRepository repository)
+        {
+            var modele = repository.GetModeleById(modeleId);
+            if (modele == null)
+                return NotFound("Modèle introuvable.");
+
+            if (string.IsNullOrWhiteSpace(modele.CheminDossier))
+                return BadRequest("Le modèle n'a pas de chemin de dossier.");
+
+            if (fichiers == null || fichiers.Count == 0)
+                return BadRequest("Aucun fichier envoyé.");
+
+            try
+            {
+                var racine = Path.GetFullPath(modele.CheminDossier);
+                Directory.CreateDirectory(racine);
+
+                var extensionsImages = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                    { ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp" };
+
+                for (int i = 0; i < fichiers.Count; i++)
+                {
+                    var fichier = fichiers[i];
+
+                    // Le chemin relatif accompagne le fichier ; à défaut on retombe sur son nom seul.
+                    var relatif = (cheminsRelatifs != null && i < cheminsRelatifs.Count)
+                        ? cheminsRelatifs[i]
+                        : fichier.FileName;
+
+                    var cheminFichier = CombinerCheminSecurise(racine, relatif);
+                    if (cheminFichier == null)
+                        return BadRequest($"Chemin relatif refusé : {relatif}");
+
+                    var dossierCible = Path.GetDirectoryName(cheminFichier);
+                    if (!string.IsNullOrEmpty(dossierCible))
+                        Directory.CreateDirectory(dossierCible);
+
+                    using (var stream = new FileStream(cheminFichier, FileMode.Create))
+                        await fichier.CopyToAsync(stream);
+
+                    if (extensionsImages.Contains(Path.GetExtension(cheminFichier))
+                        && !modele.CheminsImages.Contains(cheminFichier))
+                    {
+                        modele.CheminsImages.Add(cheminFichier);
+                    }
+                }
+
+                repository.UpdateModele(modele);
+                logger.LogInformation(
+                    "{Count} fichier(s) téléversés dans {Chemin}", fichiers.Count, modele.CheminDossier);
+
+                return Ok(new { Message = $"{fichiers.Count} fichier(s) enregistré(s).", ModeleId = modeleId });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Erreur lors du téléversement du dossier.");
+                return StatusCode(500, $"Erreur interne : {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Combine un chemin relatif reçu du client avec la racine du dossier du modèle, en refusant
+        /// toute tentative de sortie de ce dossier (« .. », chemin absolu, lettre de lecteur).
+        /// </summary>
+        /// <returns>Le chemin absolu du fichier, ou <c>null</c> si le chemin relatif est refusé.</returns>
+        private static string? CombinerCheminSecurise(string racine, string cheminRelatif)
+        {
+            if (string.IsNullOrWhiteSpace(cheminRelatif))
+                return null;
+
+            var segments = cheminRelatif
+                .Replace('\\', '/')
+                .Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+            if (segments.Length == 0)
+                return null;
+
+            if (segments.Any(s => s == "." || s == ".." || s.Contains(':')))
+                return null;
+
+            var complet = Path.GetFullPath(Path.Combine(racine, Path.Combine(segments)));
+            var prefixeRacine = racine.TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+
+            return complet.StartsWith(prefixeRacine, StringComparison.OrdinalIgnoreCase) ? complet : null;
+        }
+
+        /// <summary>
+        /// Réindexe les images d'un modèle en parcourant son dossier et ses sous-dossiers.
+        /// À appeler après une copie de fichiers réalisée en dehors de l'API (copie réseau directe
+        /// depuis le client Windows vers le partage du NAS).
+        /// </summary>
+        [HttpPost("reindexerModele/{id}")]
+        public IActionResult ReindexerModele(
+            int id,
+            [FromServices] StlExplorerServer.Repositories.IMetadonneesRepository repository)
+        {
+            var modele = repository.GetModeleById(id);
+            if (modele == null)
+                return NotFound("Modèle introuvable.");
+
+            if (string.IsNullOrWhiteSpace(modele.CheminDossier) || !Directory.Exists(modele.CheminDossier))
+                return NotFound("Dossier introuvable sur le disque.");
+
+            try
+            {
+                var images = Directory
+                    .EnumerateFiles(modele.CheminDossier, "*.*", SearchOption.AllDirectories)
+                    .Where(f => Path.GetExtension(f).ToLowerInvariant()
+                        is ".jpg" or ".jpeg" or ".png" or ".webp")
+                    .ToList();
+
+                modele.CheminsImages = images;
+                repository.UpdateModele(modele);
+
+                logger.LogInformation("Modèle {Id} réindexé : {Count} image(s).", id, images.Count);
+                return Ok(new { ModeleId = id, Images = images.Count });
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Erreur lors de la réindexation du modèle {Id}.", id);
                 return StatusCode(500, $"Erreur interne : {ex.Message}");
             }
         }

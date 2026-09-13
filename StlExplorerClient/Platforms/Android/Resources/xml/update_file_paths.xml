@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dossiers que le FileProvider est autorisé à exposer à l'installateur système.
+  L'APK de mise à jour est téléchargé dans FileSystem.CacheDirectory, qui correspond
+  au cache interne de l'application (<cache-path>).
+-->
+<paths>
+	<cache-path name="cache_interne" path="." />
+	<files-path name="fichiers_internes" path="." />
+	<external-cache-path name="cache_externe" path="." />
+</paths>

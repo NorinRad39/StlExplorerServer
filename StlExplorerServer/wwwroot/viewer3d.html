@@ -4,75 +4,90 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body { margin: 0; overflow: hidden; background: #2D2D2D; }
-canvas { display: block; }
+/* touch-action / overscroll : sur mobile, le glissement doit faire tourner le
+   modele et non defiler la page qui contient la WebView. */
+html, body {
+  margin: 0; height: 100%; overflow: hidden; background: #2D2D2D;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+canvas { display: block; touch-action: none; }
 #info { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-        color: #666; font-family: sans-serif; font-size: 12px; pointer-events: none; }
+        color: #666; font-family: sans-serif; font-size: 12px; pointer-events: none;
+        text-align: center; max-width: 95%; }
 </style>
 </head>
 <body>
-<div id="info">Clic gauche = rotation · Clic droit = panoramique · Molette = zoom</div>
+<div id="info">Chargement du visualiseur 3D...</div>
 <script>
   // ------------------------------------------------------------------
-  // Remontee des erreurs vers le journal de debug de l'app (C#) via une
-  // fausse navigation interceptee par MainPage.xaml.cs (Viewer3DWebView.Navigating).
-  // Indispensable sur Android : sans ca, un echec (WebGL absent, CDN
-  // injoignable, module JS en erreur...) se traduit juste par un ecran
-  // vide, sans aucun indice.
+  // Journal du viewer.
+  // 1. Le message est affiche directement a l'ecran (div #info) : sur
+  //    telephone c'est le diagnostic le plus simple, il suffit de regarder.
+  // 2. Il est empile dans window.__viewerLog, que l'app lit ensuite via
+  //    EvaluateJavaScriptAsync pour l'ecrire dans son journal de debug.
+  //
+  // NB : surtout PAS de "window.location.href = schema-maison://..." ici.
+  // Android quitte la page sur un schema d'URL inconnu (ERR_UNKNOWN_URL_SCHEME)
+  // si l'app ne l'intercepte pas -> le viewer se sabordait lui-meme des que
+  // l'APK installe etait plus ancien que la page servie par le NAS.
   // ------------------------------------------------------------------
+  window.__viewerLog = [];
+
   function reportLog(message, fatal) {
-    try {
-      var prefixe = fatal ? 'FATAL:' : '';
-      window.location.href = 'stlviewerlog://' + encodeURIComponent(prefixe + message);
-    } catch (e) { /* navigation impossible : tant pis pour le log natif */ }
+    window.__viewerLog.push((fatal ? '[ERREUR] ' : '') + message);
+    if (window.__viewerLog.length > 50) window.__viewerLog.shift();
 
     var info = document.getElementById('info');
     if (info) {
       info.textContent = message;
-      info.style.color = fatal ? '#ff6b6b' : '#ffb74d';
+      info.style.color = fatal ? '#ff6b6b' : '#666';
     }
   }
 
+  // Appelee par l'app (C#) pour recuperer le journal accumule.
+  window.__lireLog = function () {
+    return window.__viewerLog.join('\n');
+  };
+
+  // Les erreurs de chargement de ressource (module JS introuvable) ne
+  // remontent qu'en phase de capture, d'ou le troisieme argument "true".
   window.addEventListener('error', function (e) {
+    if (e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK')) {
+      reportLog('Script introuvable : ' + (e.target.src || e.target.href), true);
+      return;
+    }
     reportLog('Erreur script : ' + (e.message || e.error || 'inconnue'), true);
-  });
+  }, true);
+
   window.addEventListener('unhandledrejection', function (e) {
     var raison = (e.reason && e.reason.message) ? e.reason.message : String(e.reason);
     reportLog('Promesse rejetee : ' + raison, true);
   });
 
   // ------------------------------------------------------------------
-  // File d'attente pour window.loadModel : sur mobile, le module Three.js
-  // (charge depuis un CDN, ~1,3 Mo) peut mettre plusieurs secondes a etre
-  // pret. Le client appelle loadModel() des que la page a fini de
-  // naviguer, sans attendre le module -> sans cette file, l'appel se
-  // perdrait silencieusement si le module n'est pas encore charge.
+  // File d'attente pour window.loadModel : le client appelle loadModel()
+  // des que la page a fini de naviguer, sans attendre que ce module soit
+  // pret. Sans cette file, l'appel se perdrait silencieusement.
   // ------------------------------------------------------------------
   window.__pendingModel = null;
   window.loadModel = function (url, extension) {
     window.__pendingModel = { url: url, extension: extension };
   };
-
-  reportLog('Chargement du visualiseur 3D...', false);
-</script>
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
-  }
-}
 </script>
 <script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { STLLoader } from 'three/addons/loaders/STLLoader.js';
-import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+// Three.js est heberge par le serveur (wwwroot/vendor/three) et non plus charge
+// depuis un CDN : le telephone n'a pas forcement acces a Internet alors qu'il
+// joint le NAS, et les import-maps ne sont pas supportees par les vieux WebView.
+import * as THREE from './vendor/three/three.module.min.js';
+import { OrbitControls } from './vendor/three/addons/controls/OrbitControls.js';
+import { STLLoader } from './vendor/three/addons/loaders/STLLoader.js';
+import { OBJLoader } from './vendor/three/addons/loaders/OBJLoader.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x2D2D2D);
 
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.01, 100000);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 100000);
 
 let renderer;
 try {
@@ -81,9 +96,39 @@ try {
   reportLog('WebGL indisponible sur cet appareil : ' + e.message, true);
   throw e;
 }
-renderer.setPixelRatio(window.devicePixelRatio);
-renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio || 1);
 document.body.appendChild(renderer.domElement);
+
+// ------------------------------------------------------------------
+// Dimensionnement robuste.
+// Sur Android, la WebView est encore masquee (Visibility.Gone) au moment ou
+// la page se charge : window.innerWidth/innerHeight valent alors 0, ce qui
+// donne un canvas 0x0 et un ratio de camera NaN -> plus rien ne s'affiche,
+// meme une fois la WebView rendue visible. On ignore donc les tailles nulles
+// et on re-dimensionne des que la taille reelle est connue (ResizeObserver).
+// ------------------------------------------------------------------
+let largeurCourante = 0, hauteurCourante = 0;
+
+function ajusterTaille() {
+  const largeur = window.innerWidth || document.documentElement.clientWidth || 0;
+  const hauteur = window.innerHeight || document.documentElement.clientHeight || 0;
+
+  if (largeur <= 0 || hauteur <= 0) return false;              // WebView encore masquee
+  if (largeur === largeurCourante && hauteur === hauteurCourante) return true;
+
+  largeurCourante = largeur;
+  hauteurCourante = hauteur;
+  camera.aspect = largeur / hauteur;
+  camera.updateProjectionMatrix();
+  renderer.setSize(largeur, hauteur);
+  return true;
+}
+
+ajusterTaille();
+window.addEventListener('resize', ajusterTaille);
+if (typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(ajusterTaille).observe(document.documentElement);
+}
 
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -105,58 +150,69 @@ function centerAndFit(obj) {
   const center = box.getCenter(new THREE.Vector3());
   const size = box.getSize(new THREE.Vector3());
   obj.position.sub(center);
-  const maxDim = Math.max(size.x, size.y, size.z);
+  const maxDim = Math.max(size.x, size.y, size.z) || 1;
   camera.position.set(maxDim * 0.8, maxDim * 0.6, maxDim * 1.2);
+  camera.near = maxDim / 1000;
+  camera.far = maxDim * 100;
+  camera.updateProjectionMatrix();
   controls.target.set(0, 0, 0);
   controls.update();
 }
 
 const mat = new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.25, roughness: 0.65 });
+const AIDE = 'Clic gauche = rotation · Clic droit = panoramique · Molette = zoom';
 
-window.loadModel = function(url, extension) {
-  reportLog('Chargement du modele...', false);
+window.loadModel = function (url, extension) {
+  reportLog('Telechargement du fichier 3D...', false);
   clearMeshes();
-  const ext = extension.toLowerCase();
+  ajusterTaille();
+
+  const ext = (extension || '').toLowerCase();
   const onError = function (err) {
-    reportLog('Chargement du fichier 3D echoue : ' + (err && err.message ? err.message : err), true);
+    const detail = err && (err.message || err.type || err.status) ? (err.message || err.type || err.status) : err;
+    reportLog('Chargement du fichier 3D echoue : ' + detail, true);
   };
+  const onLoaded = function () {
+    ajusterTaille();
+    reportLog(AIDE, false);
+  };
+
   if (ext === '.stl') {
-    new STLLoader().load(url, function(geometry) {
+    new STLLoader().load(url, function (geometry) {
       geometry.computeVertexNormals();
       const mesh = new THREE.Mesh(geometry, mat);
       scene.add(mesh);
       centerAndFit(mesh);
-      reportLog('Clic gauche = rotation · Clic droit = panoramique · Molette = zoom', false);
+      onLoaded();
     }, undefined, onError);
   } else if (ext === '.obj') {
-    new OBJLoader().load(url, function(group) {
+    new OBJLoader().load(url, function (group) {
       group.traverse(c => { if (c.isMesh) c.material = mat; });
       scene.add(group);
       centerAndFit(group);
-      reportLog('Clic gauche = rotation · Clic droit = panoramique · Molette = zoom', false);
+      onLoaded();
     }, undefined, onError);
+  } else {
+    reportLog('Extension non geree par l\'apercu 3D : ' + ext, true);
   }
 };
 
-// Le module vient de finir de charger : rejouer une demande recue plus tot
-// (le client appelle loadModel() des la fin de la navigation, potentiellement
-// avant que ce module -- charge depuis un CDN -- ait fini de s'executer).
-if (window.__pendingModel) {
-  window.loadModel(window.__pendingModel.url, window.__pendingModel.extension);
-  window.__pendingModel = null;
-}
-
 (function animate() {
   requestAnimationFrame(animate);
+  // La taille reelle n'est parfois connue qu'apres l'affichage de la WebView.
+  if (largeurCourante === 0) ajusterTaille();
   controls.update();
   renderer.render(scene, camera);
 })();
 
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
+// Rejouer une demande de chargement recue avant que ce module soit pret.
+if (window.__pendingModel) {
+  const attente = window.__pendingModel;
+  window.__pendingModel = null;
+  window.loadModel(attente.url, attente.extension);
+} else {
+  reportLog('Visualiseur 3D pret.', false);
+}
 </script>
 </body>
 </html>

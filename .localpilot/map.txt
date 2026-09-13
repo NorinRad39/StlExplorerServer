@@ -1,0 +1,164 @@
+## WORKSPACE EXECUTIVE SUMMARY (YAML)
+# Generated: 2026-09-07T21:53:59.1438055+02:00
+# Root: D:\Code\source\repos\NorinRad39\StlExplorerServer
+Architecture:
+  Type: Backend (C#/.NET)
+  Scale: 68 relevant source files
+  Components: 0
+  Controllers: 1
+  Models: 0
+  Services: 3
+---
+- File: StlExplorerServer.sln
+  Preview: " Microsoft Visual Studio Solution File, Format Version 12.00 # Visual Studio Version 18 VisualStudioVersion = 18.4.11605.240 stable MinimumVisualStudi..."
+- File: ClassLibStlExploServ\ClassLibStlExploServ.csproj
+  Preview: "<Project Sdk='Microsoft.NET.Sdk'>  <PropertyGroup> 	<TargetFrameworks Condition=''$(ServerOnly)' != 'true''>net10.0;net10.0-android;net10.0-ios;net10...."
+- File: StlExplorerClient\StlExplorerClient.csproj
+  Preview: "<Project Sdk='Microsoft.NET.Sdk'> 	<PropertyGroup> 		<TargetFrameworks>net10.0-android</TargetFrameworks> 		<TargetFrameworks Condition='!$([MSBuild]:..."
+- File: StlExplorerServer\StlExplorerServer.csproj
+  Preview: "<Project Sdk='Microsoft.NET.Sdk.Web'>  <PropertyGroup>   <TargetFramework>net10.0</TargetFramework>   <Nullable>enable</Nullable>   <ImplicitUsings>en..."
+- File: docker-compose.yml
+  Preview: "services:  # ── Base de données MariaDB ──  # network_mode: host → le conteneur partage directement le réseau du NAS.  # Contournement obligatoire sur..."
+- File: LICENSE.txt
+  Preview: "          GNU GENERAL PUBLIC LICENSE            Version 3, 29 June 2007  Copyright (C) 2007 Free Software Foundation, Inc. <https://fsf.org/> Everyone..."
+- File: README.md
+  Preview: "# StlExplorerServer"
+- File: .github\copilot-instructions.md
+  Preview: "# Contexte et Directives du Projet StlExplorerServer Ce document sert de manuel de reference central pour le projet. Il est redige pour etre facilemen..."
+- File: ClassLibStlExploServ\ClassLibStlExploServ.cs
+  Preview: "namespace ClassLibStlExploServ {   #region Classe Modele   /// <summary>   /// Représente un modèle contenant des informations associées à un sujet.  ..."
+- File: scripts\build-apk.ps1
+  Preview: "<# .SYNOPSIS   Regenere l'APK Android du client StlExplorer, pret a installer. .DESCRIPTION   Publie StlExplorerClient en Release pour Android et copi..."
+- File: scripts\build-docker.ps1
+  Preview: "<# .SYNOPSIS   Reconstruit l'image Docker du serveur StlExplorer et l'exporte, prete a deployer sur le NAS. .DESCRIPTION   Reconstruit l'image stlexpl..."
+- File: StlExplorerClient\App.xaml.cs
+  Symbols: [App, App]
+  Preview: "using Microsoft.Extensions.DependencyInjection; namespace StlExplorerClient {   public partial class App : Application   {     public App()     {     ..."
+- File: StlExplorerClient\AppShell.xaml.cs
+  Symbols: [AppShell, AppShell]
+  Preview: "namespace StlExplorerClient {   public partial class AppShell : Shell   {     public AppShell()     {       InitializeComponent();     }   } } "
+- File: StlExplorerClient\ConfigPage.xaml.cs
+  Symbols: [ConfigPage]
+  Preview: "using System.Net.Http.Json; namespace StlExplorerClient {   public partial class ConfigPage : ContentPage   {     public const string ServerUrlKey = '..."
+- File: StlExplorerClient\MainPage.xaml.cs
+  Preview: "using System.Net.Http.Json; using System.Net.Http.Headers; using ClassLibStlExploServ; namespace StlExplorerClient {   // DTOs pour le statut et la pr..."
+- File: StlExplorerClient\MauiProgram.cs
+  Symbols: [MauiProgram, CreateMauiApp]
+  Preview: "using Microsoft.Extensions.Logging; namespace StlExplorerClient {   public static class MauiProgram   {     public static MauiApp CreateMauiApp()     ..."
+- File: StlExplorerServer\appsettings.Development.json
+  Preview: "{  'Logging': {   'LogLevel': {    'Default': 'Information',    'Microsoft.AspNetCore': 'Warning'   }  } } "
+- File: StlExplorerServer\appsettings.json
+  Preview: "{  'Logging': {   'LogLevel': {    'Default': 'Debug',    'Microsoft.AspNetCore': 'Debug',    'Microsoft.EntityFrameworkCore': 'Debug'   }  },  'Allow..."
+- File: StlExplorerServer\Program.cs
+  Preview: "using Microsoft.EntityFrameworkCore; using StlExplorerServer.Data; using StlExplorerServer.Repositories; using StlExplorerServer.Services; #region Ini..."
+- File: publish\windows\AboutAssets.txt
+  Preview: "Any raw assets you want to be deployed with your application can be placed in this directory (and child directories). Deployment of the asset to your ..."
+- File: publish\windows\StlExplorerClient.deps.json
+  Preview: "{  'runtimeTarget': {   'name': '.NETCoreApp,Version=v10.0/win-x64',   'signature': ''  },  'compilationOptions': {},  'targets': {   '.NETCoreApp,Ver..."
+- File: publish\windows\StlExplorerClient.runtimeconfig.json
+  Preview: "{  'runtimeOptions': {   'tfm': 'net10.0',   'framework': {    'name': 'Microsoft.NETCore.App',    'version': '10.0.0'   },   'configProperties': {   ..."
+- File: publish\windows\workloads.365.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows\workloads.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows\workloads.lnl.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows\workloads.qnn.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows\workloads.stx.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows-standalone\AboutAssets.txt
+  Preview: "Any raw assets you want to be deployed with your application can be placed in this directory (and child directories). Deployment of the asset to your ..."
+- File: publish\windows-standalone\StlExplorerClient.deps.json
+  Preview: "{  'runtimeTarget': {   'name': '.NETCoreApp,Version=v10.0/win-x64',   'signature': ''  },  'compilationOptions': {},  'targets': {   '.NETCoreApp,Ver..."
+- File: publish\windows-standalone\StlExplorerClient.runtimeconfig.json
+  Preview: "{  'runtimeOptions': {   'tfm': 'net10.0',   'includedFrameworks': [    {     'name': 'Microsoft.NETCore.App',     'version': '10.0.5'    }   ],   'co..."
+- File: publish\windows-standalone\workloads.365.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows-standalone\workloads.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows-standalone\workloads.lnl.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows-standalone\workloads.qnn.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: publish\windows-standalone\workloads.stx.json
+  Preview: "{  'Packages': [   {    'FamilyName': 'WindowsWorkload.PSOnnxRuntime.2.7_8wekyb3d8bbwe',    'Version': '1.2505.830.0'   },   {    'FamilyName': 'Windo..."
+- File: StlExplorerClient\Properties\launchSettings.json
+  Preview: "{  'profiles': {   'Windows Machine': {    'commandName': 'Project',    'nativeDebugging': false   }  } }"
+- File: StlExplorerServer\config\override.json
+  Preview: "{}"
+- File: StlExplorerServer\Controllers\MetadataController.cs
+  Preview: "using Microsoft.AspNetCore.Mvc; using Microsoft.Extensions.Logging; using StlExplorerServer.Services; using ClassLibStlExploServ; using System; using ..."
+- File: StlExplorerServer\Data\ApplicationDbContext.cs
+  Preview: "using ClassLibStlExploServ; using Microsoft.EntityFrameworkCore; using System.Text.Json; namespace StlExplorerServer.Data {   /// <summary>   /// Cont..."
+- File: StlExplorerServer\Migrations\20260303190659_InitialCreate.cs
+  Symbols: [InitialCreate]
+  Preview: "using Microsoft.EntityFrameworkCore.Metadata; using Microsoft.EntityFrameworkCore.Migrations; #nullable disable namespace StlExplorerServer.Migrations..."
+- File: StlExplorerServer\Migrations\20260303190659_InitialCreate.Designer.cs
+  Preview: "// <auto-generated /> using Microsoft.EntityFrameworkCore; using Microsoft.EntityFrameworkCore.Infrastructure; using Microsoft.EntityFrameworkCore.Met..."
+- File: StlExplorerServer\Migrations\20260315165718_AddCheminDossier.cs
+  Symbols: [AddCheminDossier]
+  Preview: "using Microsoft.EntityFrameworkCore.Migrations; #nullable disable namespace StlExplorerServer.Migrations {   /// <inheritdoc />   public partial class..."
+- File: StlExplorerServer\Migrations\20260315165718_AddCheminDossier.Designer.cs
+  Preview: "// <auto-generated /> using Microsoft.EntityFrameworkCore; using Microsoft.EntityFrameworkCore.Infrastructure; using Microsoft.EntityFrameworkCore.Met..."
+- File: StlExplorerServer\Migrations\20260315173822_AddCheminsImages.cs
+  Symbols: [AddCheminsImages]
+  Preview: "using Microsoft.EntityFrameworkCore.Migrations; #nullable disable namespace StlExplorerServer.Migrations {   /// <inheritdoc />   public partial class..."
+- File: StlExplorerServer\Migrations\20260315173822_AddCheminsImages.Designer.cs
+  Preview: "// <auto-generated /> using Microsoft.EntityFrameworkCore; using Microsoft.EntityFrameworkCore.Infrastructure; using Microsoft.EntityFrameworkCore.Met..."
+- File: StlExplorerServer\Migrations\20260315173914_AddImagesToModele.cs
+  Symbols: [AddImagesToModele]
+  Preview: "using Microsoft.EntityFrameworkCore.Migrations; #nullable disable namespace StlExplorerServer.Migrations {   /// <inheritdoc />   public partial class..."
+- File: StlExplorerServer\Migrations\20260315173914_AddImagesToModele.Designer.cs
+  Preview: "// <auto-generated /> using Microsoft.EntityFrameworkCore; using Microsoft.EntityFrameworkCore.Infrastructure; using Microsoft.EntityFrameworkCore.Met..."
+- File: StlExplorerServer\Migrations\20260315174341_AddCheminDossierToModele.cs
+  Symbols: [AddCheminDossierToModele]
+  Preview: "using Microsoft.EntityFrameworkCore.Migrations; #nullable disable namespace StlExplorerServer.Migrations {   /// <inheritdoc />   public partial class..."
+- File: StlExplorerServer\Migrations\20260315174341_AddCheminDossierToModele.Designer.cs
+  Preview: "// <auto-generated /> using Microsoft.EntityFrameworkCore; using Microsoft.EntityFrameworkCore.Infrastructure; using Microsoft.EntityFrameworkCore.Met..."
+- File: StlExplorerServer\Migrations\20260315181220_AddCheminsImagesToModele.cs
+  Symbols: [AddCheminsImagesToModele]
+  Preview: "using Microsoft.EntityFrameworkCore.Migrations; #nullable disable namespace StlExplorerServer.Migrations {   /// <inheritdoc />   public partial class..."
+- File: StlExplorerServer\Migrations\20260315181220_AddCheminsImagesToModele.Designer.cs
+  Preview: "// <auto-generated /> using Microsoft.EntityFrameworkCore; using Microsoft.EntityFrameworkCore.Infrastructure; using Microsoft.EntityFrameworkCore.Met..."
+- File: StlExplorerServer\Migrations\ApplicationDbContextModelSnapshot.cs
+  Preview: "// <auto-generated /> using Microsoft.EntityFrameworkCore; using Microsoft.EntityFrameworkCore.Infrastructure; using Microsoft.EntityFrameworkCore.Met..."
+- File: StlExplorerServer\Properties\launchSettings.json
+  Preview: "{  'profiles': {   'http': {    'commandName': 'Project',    'launchBrowser': true,    'launchUrl': 'swagger',    'environmentVariables': {     'ASPNE..."
+- File: StlExplorerServer\Repositories\IMetadonneesRepository.cs
+  Symbols: [IMetadonneesRepository]
+  Preview: "using ClassLibStlExploServ; namespace StlExplorerServer.Repositories {   /// <summary>   /// Interface pour le référentiel de métadonnées.   /// </sum..."
+- File: StlExplorerServer\Repositories\MetadataRepository.cs
+  Preview: "using ClassLibStlExploServ; using StlExplorerServer.Data; using Microsoft.EntityFrameworkCore; using System.Linq; namespace StlExplorerServer.Reposito..."
+- File: StlExplorerServer\Services\BackgroundScannerHostedService.cs
+  Preview: "using Microsoft.Extensions.Configuration; using Microsoft.Extensions.DependencyInjection; using Microsoft.Extensions.Hosting; using Microsoft.Extensio..."
+- File: StlExplorerServer\Services\FolderScannerService.cs
+  Preview: "using System; using System.Collections.Generic; using System.IO; using System.Linq; using ClassLibStlExploServ; using Microsoft.Extensions.Logging; us..."
+- File: StlExplorerServer\Services\IFolderScannerService.cs
+  Symbols: [IFolderScannerService]
+  Preview: "namespace StlExplorerServer.Services {   public interface IFolderScannerService   {     void ScanFolder(string path);     void ScanAllConfiguredFolder..."
+- File: StlExplorerClient\Platforms\Android\AndroidManifest.xml
+  Preview: "<?xml version='1.0' encoding='utf-8'?> <manifest xmlns:android='http://schemas.android.com/apk/res/android'> 	<application android:allowBackup='true' ..."
+- File: StlExplorerClient\Platforms\Android\MainActivity.cs
+  Preview: "using Android.App; using Android.Content.PM; using Android.OS; namespace StlExplorerClient.Platforms.Android {   [Activity(Theme = '@style/Maui.Splash..."
+- File: StlExplorerClient\Platforms\Android\MainApplication.cs
+  Symbols: [MainApplication, MauiApplication]
+  Preview: "using Android.App; using Android.Runtime; namespace StlExplorerClient.Platforms.Android {   [Application]   public class MainApplication(IntPtr handle..."
+- File: StlExplorerClient\Platforms\iOS\AppDelegate.cs
+  Symbols: [AppDelegate]
+  Preview: "using Foundation; namespace StlExplorerClient.Platforms.iOS {   [Register('AppDelegate')]   public class AppDelegate : MauiUIApplicationDelegate   {  ..."
+- File: StlExplorerClient\Platforms\iOS\Program.cs
+  Symbols: [Program, Main]
+  Preview: "using ObjCRuntime; using UIKit; namespace StlExplorerClient.Platforms.iOS {   public class Program   {     // This is the main entry point of the appl..."
+- File: StlExplorerClient\Platforms\MacCatalyst\AppDelegate.cs
+  Symbols: [AppDelegate]
+  Preview: "using Foundation; namespace StlExplorerClient.Platforms.MacCatalyst {   [Register('AppDelegate')]   public class AppDelegate : MauiUIApplicationDelega..."
+- File: StlExplorerClient\Platforms\MacCatalyst\Program.cs
+  Symbols: [Program, Main]
+  Preview: "using ObjCRuntime; using UIKit; namespace StlExplorerClient.Platforms.MacCatalyst {   public class Program   {     // This is the main entry point of ..."
+- File: StlExplorerClient\Platforms\Windows\App.xaml.cs
+  Preview: "using Microsoft.UI.Xaml; // To learn more about WinUI, the WinUI project structure, // and more about our project templates, see: http://aka.ms/winui-..."
+- File: StlExplorerClient\Resources\Raw\AboutAssets.txt
+  Preview: "Any raw assets you want to be deployed with your application can be placed in this directory (and child directories). Deployment of the asset to your ..."
+- File: StlExplorerClient\Platforms\Android\Resources\values\colors.xml
+  Preview: "<?xml version='1.0' encoding='utf-8'?> <resources>   <color name='colorPrimary'>#512BD4</color>   <color name='colorPrimaryDark'>#2B0B98</color>   <co..."

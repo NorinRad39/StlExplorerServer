@@ -25,9 +25,10 @@
 		<!-- App Identifier -->
 		<ApplicationId>com.companyname.stlexplorerclient</ApplicationId>
 
-		<!-- Versions -->
-		<ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
-		<ApplicationVersion>1</ApplicationVersion>
+		<!-- Versions : source de vérité pour les scripts de deploy\ et la mise à jour auto.
+		     ApplicationVersion (versionCode Android) DOIT augmenter à chaque publication. -->
+		<ApplicationDisplayVersion>1.1.2</ApplicationDisplayVersion>
+		<ApplicationVersion>4</ApplicationVersion>
 
 		<!-- To develop, package, and publish an app to the Microsoft Store, see: https://aka.ms/MauiTemplateUnpackaged -->
 		<WindowsPackageType>None</WindowsPackageType>
@@ -37,6 +38,20 @@
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'android'">21.0</SupportedOSPlatformVersion>
 		<SupportedOSPlatformVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</SupportedOSPlatformVersion>
 		<TargetPlatformMinVersion Condition="$([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">10.0.17763.0</TargetPlatformMinVersion>
+	</PropertyGroup>
+
+	<!--
+		Publication Windows autonome (utilisee par deploy\deploy-windows.ps1 via
+		-p:PublishStandalone=true). Ces proprietes sont volontairement definies ICI
+		et non sur la ligne de commande : passees en global, RuntimeIdentifier et
+		SelfContained se propagent aux TFM Android du projet partage, qui cherche
+		alors un runtime Mono win-x64 inexistant (NU1102).
+	-->
+	<PropertyGroup Condition="'$(PublishStandalone)' == 'true' and $([MSBuild]::GetTargetPlatformIdentifier('$(TargetFramework)')) == 'windows'">
+		<RuntimeIdentifier>win-x64</RuntimeIdentifier>
+		<SelfContained>true</SelfContained>
+		<WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+		<PublishSingleFile>false</PublishSingleFile>
 	</PropertyGroup>
 
 	<ItemGroup>

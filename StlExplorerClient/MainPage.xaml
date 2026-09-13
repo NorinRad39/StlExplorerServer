@@ -54,12 +54,18 @@
 
         <!-- Contenu principal -->
         <ScrollView Grid.Row="1">
-            <VerticalStackLayout
-                Padding="30"
-                Spacing="20">
+            <VerticalStackLayout Spacing="20">
+                <!-- Marges resserrées sur téléphone : 30 px de chaque côté amputaient
+                     un écran de ~360 dp d'un sixième de sa largeur utile. -->
+                <VerticalStackLayout.Padding>
+                    <OnIdiom x:TypeArguments="Thickness" Default="30" Phone="16,20" />
+                </VerticalStackLayout.Padding>
+
 
                 <!-- Formulaire hiérarchique avec ComboBox simulées -->
-                <Grid RowSpacing="5" ColumnSpacing="15" HorizontalOptions="Start">
+                <!-- Largeur adaptative : la colonne des champs s'étire jusqu'à 350 px sur
+                     grand écran, et se réduit pour tenir sur la largeur d'un téléphone. -->
+                <Grid RowSpacing="5" ColumnSpacing="15" HorizontalOptions="Fill" MaximumWidthRequest="445">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
@@ -69,8 +75,10 @@
                         <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="80" />
-                        <ColumnDefinition Width="350" />
+                        <!-- Auto : la colonne des libellés prend la largeur du mot le plus
+                             long (« Famille ») au lieu d'un 80 px figé. -->
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
                     <!-- Ligne Famille -->
@@ -131,12 +139,20 @@
                     </Border>
                 </Grid>
 
-                <!-- Défilement rapide des modèles du sujet (boutons ou flèches ◀ ▶ du clavier) -->
-                <HorizontalStackLayout x:Name="ModeleNavPanel" IsVisible="False" Spacing="12" HorizontalOptions="Start">
+                <!-- Défilement rapide des modèles du sujet (boutons ou flèches ◀ ▶ du clavier).
+                     Boutons compacts et libellé tronqué : sur téléphone, la largeur disponible
+                     ne permet pas des boutons texte suivis d'un nom de modèle complet. -->
+                <Grid x:Name="ModeleNavPanel"
+                      IsVisible="False"
+                      ColumnDefinitions="Auto, Auto, *"
+                      ColumnSpacing="10"
+                      HorizontalOptions="Fill"
+                      MaximumWidthRequest="445">
                     <Button x:Name="BtnModelePrecedent"
-                            Text="&#x25C0; Modèle"
-                            FontSize="14"
-                            WidthRequest="120"
+                            Grid.Column="0"
+                            Text="&#x25C0;"
+                            FontSize="16"
+                            WidthRequest="60"
                             HeightRequest="40"
                             BackgroundColor="#37474F"
                             TextColor="White"
@@ -144,9 +160,10 @@
                             ToolTipProperties.Text="Modèle précédent (flèche gauche du clavier)"
                             Clicked="OnModelePrecedentClicked" />
                     <Button x:Name="BtnModeleSuivant"
-                            Text="Modèle &#x25B6;"
-                            FontSize="14"
-                            WidthRequest="120"
+                            Grid.Column="1"
+                            Text="&#x25B6;"
+                            FontSize="16"
+                            WidthRequest="60"
                             HeightRequest="40"
                             BackgroundColor="#37474F"
                             TextColor="White"
@@ -154,11 +171,13 @@
                             ToolTipProperties.Text="Modèle suivant (flèche droite du clavier)"
                             Clicked="OnModeleSuivantClicked" />
                     <Label x:Name="ModeleNavLabel"
+                           Grid.Column="2"
                            Text=""
                            TextColor="#B0BEC5"
                            FontSize="13"
+                           LineBreakMode="TailTruncation"
                            VerticalOptions="Center" />
-                </HorizontalStackLayout>
+                </Grid>
 
                 <!-- Zone d'actions (Windows uniquement) -->
                 <HorizontalStackLayout x:Name="WindowsActionsPanel" IsVisible="False" Spacing="10" HorizontalOptions="Start">

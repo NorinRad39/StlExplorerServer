@@ -22,7 +22,36 @@ namespace StlExplorerClient
             if (DeviceInfo.Platform == DevicePlatform.WinUI)
                 BtnParcourir.IsVisible = true;
 
+            VersionLabel.Text = $"Version installée : {AppInfo.Current.VersionString} "
+                              + $"(build {AppInfo.Current.BuildString})";
+
             ChargerConfiguration();
+        }
+
+        /// <summary>
+        /// Vérifie manuellement la présence d'une nouvelle version publiée sur le NAS.
+        /// La logique (comparaison, téléchargement, installation) vit dans MainPage,
+        /// qui possède déjà la barre de progression et le journal de debug.
+        /// </summary>
+        private async void OnVerifierMajClicked(object sender, EventArgs e)
+        {
+            var page = Navigation.NavigationStack.FirstOrDefault(p => p is MainPage) as MainPage;
+            if (page == null)
+            {
+                await DisplayAlert("Mise à jour", "Page principale introuvable.", "OK");
+                return;
+            }
+
+            try
+            {
+                BtnVerifierMaj.IsEnabled = false;
+                await Navigation.PopAsync();          // revenir sur MainPage pour voir la progression
+                await page.VerifierMisesAJourAsync(silencieux: false);
+            }
+            finally
+            {
+                BtnVerifierMaj.IsEnabled = true;
+            }
         }
 
         private async void OnAppliquerUrlClicked(object sender, EventArgs e)

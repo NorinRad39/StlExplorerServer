@@ -48,6 +48,9 @@ services:
     volumes:
       - /volume1/Maquette/3D_Maquettes:/data/3D_Maquettes:rw
       - stlexplorer_config:/app/config
+      # Paquets de mise à jour des clients (APK Android, setup Windows) déposés par deploy\.
+      # Correspond au partage réseau \\ds923.file4all.fr\Applications\STLExplorer (lecteur V:).
+      - /volume1/Applications/STLExplorer:/data/updates:ro
 
 volumes:
   mariadb_data:

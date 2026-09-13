@@ -1,6 +1,7 @@
 ﻿using System.Net.Http.Json;
 using System.Net.Http.Headers;
 using ClassLibStlExploServ;
+using StlExplorerClient.Services;
 
 namespace StlExplorerClient
 {
@@ -43,6 +44,13 @@ namespace StlExplorerClient
         // Le viewer 3D affiche une seule alerte fatale par session (WebGL absent, module JS en échec...)
         // pour ne pas spammer l'utilisateur si l'erreur se reproduit à chaque fichier 3D ouvert.
         private bool _erreurViewer3DAffichee;
+
+        // Nombre de lignes du journal du viewer 3D déjà recopiées dans le journal de debug.
+        private int _viewer3DLignesLues;
+
+        // Suffixe anti-cache pour la page du viewer : change à chaque lancement de l'app,
+        // pour qu'une mise à jour du serveur soit prise en compte sans vider le cache.
+        private readonly long _sessionCacheBuster = DateTime.UtcNow.Ticks;
 
         public MainPage()
         {
@@ -142,6 +150,9 @@ namespace StlExplorerClient
 #if WINDOWS
             BrancherClavierWindows();
 #endif
+#if ANDROID
+            BrancherTactileViewer3D();
+#endif
             if (!_dataLoaded)
             {
                 _dataLoaded = true;
@@ -182,6 +193,9 @@ namespace StlExplorerClient
                 // pour que la barre de progression s'affiche dès que possible.
                 if (_scanPollCts == null)
                     DemarrerPollingStatutScan();
+
+                // Vérifier en arrière-plan si une nouvelle version de l'app est publiée sur le NAS
+                _ = VerifierMisesAJourAsync(silencieux: true);
 
                 // Charger les modèles avec retry si le serveur est occupé (scan en cours au démarrage)
                 await ChargerModelesAvecRetryAsync();
@@ -964,6 +978,143 @@ namespace StlExplorerClient
             }
         }
 
+#if ANDROID
+        // ============================================
+        // Tactile du viewer 3D (Android)
+        // ============================================
+
+        private bool _tactileViewer3DBranche;
+
+        /// <summary>
+        /// Permet de faire tourner le modèle au doigt sans que la page ne défile.
+        /// La WebView est dans un ScrollView : sur Android, c'est le parent qui capte
+        /// le glissement dès qu'il dépasse le seuil de défilement. On lui demande donc
+        /// de ne pas intercepter le geste tant que le doigt est sur la zone 3D ;
+        /// le reste de la page continue de défiler normalement.
+        /// </summary>
+        private void BrancherTactileViewer3D()
+        {
+            if (_tactileViewer3DBranche) return;
+            if (Viewer3DWebView.Handler?.PlatformView is not Android.Webkit.WebView natif) return;
+
+            natif.SetOnTouchListener(new ReserverGesteAuViewer3D());
+            _tactileViewer3DBranche = true;
+        }
+
+        /// <summary>
+        /// Réserve le geste tactile à la WebView pendant toute la durée du contact.
+        /// </summary>
+        private sealed class ReserverGesteAuViewer3D : Java.Lang.Object, Android.Views.View.IOnTouchListener
+        {
+            public bool OnTouch(Android.Views.View? vue, Android.Views.MotionEvent? evenement)
+            {
+                if (vue == null || evenement == null) return false;
+
+                switch (evenement.ActionMasked)
+                {
+                    case Android.Views.MotionEventActions.Down:
+                    case Android.Views.MotionEventActions.Move:
+                    case Android.Views.MotionEventActions.PointerDown:
+                        // Se propage à toute la chaîne de parents, dont le ScrollView.
+                        vue.Parent?.RequestDisallowInterceptTouchEvent(true);
+                        break;
+
+                    case Android.Views.MotionEventActions.Up:
+                    case Android.Views.MotionEventActions.Cancel:
+                        vue.Parent?.RequestDisallowInterceptTouchEvent(false);
+                        break;
+                }
+
+                // false : la WebView traite ensuite l'évènement normalement (rotation, zoom).
+                return false;
+            }
+        }
+#endif
+
+        // ============================================
+        // Mise à jour automatique de l'application
+        // ============================================
+
+        /// <summary>
+        /// Vérifie auprès du serveur si une version plus récente de l'application est publiée
+        /// sur le NAS, et propose de l'installer le cas échéant.
+        /// </summary>
+        /// <param name="silencieux">
+        /// Vrai lors de la vérification automatique au démarrage : on ne dérange l'utilisateur
+        /// que si une mise à jour existe réellement.
+        /// </param>
+        public async Task VerifierMisesAJourAsync(bool silencieux)
+        {
+            if (_httpClient == null) return;
+
+            InfoMiseAJour? maj;
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                maj = await UpdateService.VerifierAsync(_httpClient, cts.Token);
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"⚠ Vérification des mises à jour impossible : {ex.Message}");
+                if (!silencieux)
+                    await DisplayAlert("Mise à jour",
+                        "Impossible de contacter le serveur de mises à jour :\n" + ex.Message, "OK");
+                return;
+            }
+
+            if (maj == null)
+            {
+                LogDebug($"✅ Application à jour (v{UpdateService.VersionInstallee}).");
+                if (!silencieux)
+                    await DisplayAlert("Mise à jour",
+                        $"L'application est à jour (version {UpdateService.VersionInstallee}).", "OK");
+                return;
+            }
+
+            LogDebug($"⬆ Mise à jour disponible : v{maj.Version} (installée : v{UpdateService.VersionInstallee})");
+
+            var tailleMo = maj.Taille > 0 ? $"\nTaille : {maj.Taille / (1024.0 * 1024.0):F1} Mo" : "";
+            var notes = string.IsNullOrWhiteSpace(maj.Notes) ? "" : $"\n\n{maj.Notes}";
+            var question = $"Version {maj.Version} disponible "
+                         + $"(vous avez la {UpdateService.VersionInstallee}).{tailleMo}{notes}";
+
+            if (!await DisplayAlert("Mise à jour disponible", question, "Installer", "Plus tard"))
+                return;
+
+            await TelechargerEtInstallerAsync(maj);
+        }
+
+        /// <summary>
+        /// Télécharge le paquet de mise à jour en affichant la progression, puis lance
+        /// l'installation (installateur système sur Android, setup silencieux sur Windows).
+        /// </summary>
+        private async Task TelechargerEtInstallerAsync(InfoMiseAJour maj)
+        {
+            try
+            {
+                DefinirEtatCopie(true);
+                AfficherProgressionCopie(0, $"Téléchargement de la version {maj.Version}...");
+
+                var progression = new Progress<double>(p =>
+                    AfficherProgressionCopie(p, $"Téléchargement de la version {maj.Version}..."));
+
+                var paquet = await UpdateService.TelechargerAsync(_httpClient!, maj, progression);
+                LogDebug($"📦 Mise à jour téléchargée : {paquet}");
+
+                AfficherProgressionCopie(1, "Lancement de l'installation...");
+                UpdateService.Installer(paquet);
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"❌ Mise à jour impossible : {ex.Message}");
+                await DisplayAlert("Erreur", "La mise à jour a échoué :\n" + ex.Message, "OK");
+            }
+            finally
+            {
+                DefinirEtatCopie(false);
+            }
+        }
+
         // ============================================
         // Rafraîchissement global de l'interface
         // ============================================
@@ -1612,14 +1763,35 @@ namespace StlExplorerClient
             if (!string.IsNullOrEmpty(fichier.NomArchive))
                 url += $"&archive={Uri.EscapeDataString(fichier.NomArchive)}";
 
+            // Basculer l'affichage AVANT de charger la page : sur Android, une WebView
+            // masquée est en Visibility.Gone, donc de taille 0. La page se chargerait
+            // alors avec window.innerWidth/innerHeight à 0, ce qui donne un canvas 3D
+            // vide même une fois la WebView affichée.
+            ModeleImage.IsVisible = false;
+            Viewer3DWebView.IsVisible = true;
+            ImageNavPanel.IsVisible = false;
+            BtnRetourImages.IsVisible = true;
+
+#if ANDROID
+            // Le handler natif peut n'exister qu'une fois la WebView affichée.
+            BrancherTactileViewer3D();
+#endif
+
             // Charger le viewer si pas encore fait
             if (!_viewer3DVisible)
             {
-                var viewerUrl = $"{_httpClient.BaseAddress}viewer3d.html";
+                // Le paramètre ?v= empêche la WebView de resservir une version en cache
+                // du viewer après une mise à jour du serveur (une seule fois par session).
+                var viewerUrl = $"{_httpClient.BaseAddress}viewer3d.html?v={_sessionCacheBuster}";
+                LogDebug($"🧊 Ouverture du viewer 3D : {viewerUrl}");
+                _viewer3DLignesLues = 0;
+
                 var tcs = new TaskCompletionSource<bool>();
                 void OnNavigated(object? s, WebNavigatedEventArgs args)
                 {
                     Viewer3DWebView.Navigated -= OnNavigated;
+                    if (args.Result != WebNavigationResult.Success)
+                        LogDebug($"⚠ Chargement du viewer 3D : {args.Result}");
                     tcs.TrySetResult(true);
                 }
                 Viewer3DWebView.Navigated += OnNavigated;
@@ -1629,16 +1801,66 @@ namespace StlExplorerClient
                 await Task.WhenAny(tcs.Task, Task.Delay(10000));
             }
 
-            // Basculer l'affichage
-            ModeleImage.IsVisible = false;
-            Viewer3DWebView.IsVisible = true;
-            ImageNavPanel.IsVisible = false;
-            BtnRetourImages.IsVisible = true;
             _viewer3DVisible = true;
 
             // Appeler le JS pour charger le modèle
             var js = $"window.loadModel('{url.Replace("'", "\\'")}', '{ext}');";
             await Viewer3DWebView.EvaluateJavaScriptAsync(js);
+
+            // Récupérer le journal interne du viewer (une lecture rapide puis une plus
+            // tardive, le temps qu'un gros fichier 3D finisse de se télécharger).
+            _ = LireJournalViewer3DAsync(2000);
+            _ = LireJournalViewer3DAsync(8000);
+        }
+
+        /// <summary>
+        /// Lit le journal interne de viewer3d.html (window.__lireLog) et recopie les
+        /// nouvelles lignes dans le journal de debug de l'application. C'est le seul
+        /// moyen de savoir ce qui se passe dans la WebView, notamment sur Android.
+        /// </summary>
+        private async Task LireJournalViewer3DAsync(int delaiMs)
+        {
+            await Task.Delay(delaiMs);
+
+            try
+            {
+                var brut = await Viewer3DWebView.EvaluateJavaScriptAsync(
+                    "window.__lireLog ? window.__lireLog() : ''");
+
+                var texte = DecoderResultatJs(brut);
+                if (string.IsNullOrWhiteSpace(texte))
+                {
+                    if (_viewer3DLignesLues == 0)
+                        LogDebug("⚠ [Viewer3D] Aucun journal : le script de la page ne s'est pas exécuté.");
+                    return;
+                }
+
+                var lignes = texte.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+                for (int i = _viewer3DLignesLues; i < lignes.Length; i++)
+                    LogDebug($"🧊 [Viewer3D] {lignes[i]}");
+
+                if (lignes.Length > _viewer3DLignesLues)
+                    _viewer3DLignesLues = lignes.Length;
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"⚠ Lecture du journal du viewer 3D impossible : {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Décode la valeur renvoyée par EvaluateJavaScriptAsync : une chaîne JSON
+        /// (entourée de guillemets, avec \n et \" échappés).
+        /// </summary>
+        private static string DecoderResultatJs(string? brut)
+        {
+            if (string.IsNullOrEmpty(brut) || brut == "null") return "";
+
+            var texte = brut;
+            if (texte.Length >= 2 && texte.StartsWith('"') && texte.EndsWith('"'))
+                texte = texte.Substring(1, texte.Length - 2);
+
+            return texte.Replace("\\n", "\n").Replace("\\\"", "\"").Replace("\\\\", "\\");
         }
 
         private void RetourAuxImages()

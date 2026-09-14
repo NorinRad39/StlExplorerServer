@@ -33,6 +33,11 @@ VersionInfoVersion={#VersionApp}
 DefaultDirName={autopf}\STLExplorer
 DefaultGroupName={#NomApp}
 DisableProgramGroupPage=yes
+
+; Icone de l'assistant d'installation lui-meme. Les raccourcis (Bureau, menu
+; Demarrer) et la fiche « Applications installees » prennent celle de l'executable,
+; que MAUI genere a partir de Resources\AppIcon\appicon.png.
+SetupIconFile={#SourcePath}\stlexplorer.ico
 UninstallDisplayIcon={app}\{#ExeApp}
 
 ; Installation par utilisateur : pas d'elevation UAC, indispensable pour que

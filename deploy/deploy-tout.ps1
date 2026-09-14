@@ -48,9 +48,11 @@ param(
 
 . "$PSScriptRoot\_commun.ps1"
 
-Assert-PartageNas
-
 $cibles = @("serveur", "android", "windows") | Where-Object { $Sauf -notcontains $_ }
+
+# Prerequis d'abord : un numero de version ne doit pas etre consomme si la
+# publication ne peut de toute facon pas aboutir.
+Assert-Prerequis -Cibles $cibles
 
 # Version et numero de build fixes ici pour toutes les cibles : chaque script appele
 # recevra -Version et -Build explicites et n'incrementera donc pas de son cote.

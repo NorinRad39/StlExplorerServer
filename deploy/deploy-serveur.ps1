@@ -32,18 +32,10 @@ param(
 
 . "$PSScriptRoot\_commun.ps1"
 
-Assert-PartageNas
+Assert-Prerequis -Cibles @("serveur")
 Set-Location $RacineDepot
 
 if (-not $Version) { $Version = (Get-Date).ToString("yyyy.MM.dd-HHmm") }
-
-Write-Etape "Verification de Docker"
-docker info *> $null
-if ($LASTEXITCODE -ne 0) {
-    Write-Host "[ECHEC] Docker ne repond pas. Demarre Docker Desktop puis relance ce script." -ForegroundColor Red
-    exit 1
-}
-Write-Ok "Docker operationnel"
 
 Write-Etape "Reconstruction de l'image stlexplorer-server:latest"
 docker compose build stlexplorer-api

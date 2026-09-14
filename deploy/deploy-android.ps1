@@ -39,7 +39,7 @@ param(
 
 . "$PSScriptRoot\_commun.ps1"
 
-Assert-PartageNas
+Assert-Prerequis -Cibles @("android")
 Set-Location $RacineDepot
 
 $Version = Resolve-VersionAPublier -Version $Version -Niveau $Increment -SansIncrement:$SansIncrement

@@ -38,17 +38,10 @@ param(
 
 . "$PSScriptRoot\_commun.ps1"
 
-Assert-PartageNas
+Assert-Prerequis -Cibles @("windows")
 Set-Location $RacineDepot
 
-$iscc = "C:\Program Files\Inno Setup 7\ISCC.exe"
-if (-not (Test-Path $iscc)) {
-    $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
-}
-if (-not (Test-Path $iscc)) {
-    Write-Host "[ECHEC] Compilateur Inno Setup (ISCC.exe) introuvable." -ForegroundColor Red
-    exit 1
-}
+$iscc = Get-CheminInnoSetup
 
 $Version = Resolve-VersionAPublier -Version $Version -Niveau $Increment -SansIncrement:$SansIncrement
 

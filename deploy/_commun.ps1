@@ -52,6 +52,57 @@ function Assert-PartageNas {
 }
 
 <#
+    Emplacement du compilateur Inno Setup, ou $null s'il n'est pas installe.
+#>
+function Get-CheminInnoSetup {
+    foreach ($candidat in @("C:\Program Files\Inno Setup 7\ISCC.exe",
+                            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe")) {
+        if (Test-Path $candidat) { return $candidat }
+    }
+    return $null
+}
+
+<#
+    Verifie tout ce dont les cibles demandees ont besoin, AVANT la moindre
+    modification du depot ou du partage.
+
+    L'ordre compte : la premiere version de ces scripts incrementait le numero de
+    version puis decouvrait que Docker etait arrete. Le numero etait consomme pour
+    rien, et la publication s'arretait a mi-chemin, laissant les cibles suivantes
+    non publiees alors que le csproj avait deja bouge.
+#>
+function Assert-Prerequis {
+    param([Parameter(Mandatory)] [string[]]$Cibles)
+
+    Assert-PartageNas
+
+    if ($Cibles -contains "serveur") {
+        # docker ecrit sur stderr quand le demon est arrete : sans cet assouplissement,
+        # $ErrorActionPreference='Stop' transformerait le controle en erreur fatale.
+        $ancienne = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        docker info 2>$null | Out-Null
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $ancienne
+
+        if ($code -ne 0) {
+            Write-Host "[ECHEC] Docker ne repond pas. Demarre Docker Desktop, attends" -ForegroundColor Red
+            Write-Host "        qu'il soit pret, puis relance ce script." -ForegroundColor Red
+            exit 1
+        }
+        Write-Ok "Docker operationnel"
+    }
+
+    if ($Cibles -contains "windows") {
+        if (-not (Get-CheminInnoSetup)) {
+            Write-Host "[ECHEC] Compilateur Inno Setup (ISCC.exe) introuvable." -ForegroundColor Red
+            exit 1
+        }
+        Write-Ok "Inno Setup disponible"
+    }
+}
+
+<#
     Lit la version du client depuis StlExplorerClient.csproj, qui fait office de
     source de verite : ApplicationDisplayVersion (ex. 1.1.0) et ApplicationVersion
     (versionCode Android, entier croissant).

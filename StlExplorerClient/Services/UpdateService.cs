@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using System.Reflection;
 using System.Text.Json.Serialization;
 
 namespace StlExplorerClient.Services
@@ -53,11 +54,75 @@ namespace StlExplorerClient.Services
             DeviceInfo.Platform == DevicePlatform.WinUI ? "windows" : "android";
 
         /// <summary>Version installée, ex. « 1.2.0 ».</summary>
-        public static string VersionInstallee => AppInfo.Current.VersionString;
+        public static string VersionInstallee => _versionInstallee.Value;
 
-        /// <summary>Numéro de build installé (versionCode sur Android).</summary>
+        private static readonly Lazy<string> _versionInstallee = new(LireVersionApplication);
+
+        /// <summary>
+        /// Lit la version dans les attributs de l'assembly de l'application.
+        /// </summary>
+        /// <remarks>
+        /// On n'utilise pas AppInfo ici : sur Windows en mode non empaqueté, il renvoie
+        /// une version sans rapport avec la build (« 1.0.0.1 », build « 1 »), qui ne
+        /// correspond ni à l'AssemblyVersion, ni au FileVersion, ni au manifeste de
+        /// package. L'application se croyait donc obsolète en permanence.
+        /// Les attributs d'assembly, eux, sont renseignés depuis ApplicationDisplayVersion
+        /// sur toutes les plateformes.
+        /// </remarks>
+        private static string LireVersionApplication()
+        {
+            var assembly = typeof(UpdateService).Assembly;
+
+            var informationnelle = assembly
+                .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion;
+
+            var version = NormaliserVersion(informationnelle);
+            if (version != "0.0.0") return version;
+
+            version = NormaliserVersion(assembly.GetName().Version?.ToString());
+            if (version != "0.0.0") return version;
+
+            return NormaliserVersion(AppInfo.Current.VersionString);
+        }
+
+        /// <summary>
+        /// Numéro de build installé : le versionCode Android, seule plateforme où il est fiable.
+        /// </summary>
+        /// <remarks>
+        /// Sur Windows, AppInfo renvoie « 1 » quelle que soit la version publiée. Renvoyer 0
+        /// désactive la comparaison par build et laisse celle des numéros de version décider.
+        /// </remarks>
         public static int BuildInstalle =>
-            int.TryParse(AppInfo.Current.BuildString, out var build) ? build : 0;
+            DeviceInfo.Platform == DevicePlatform.Android
+            && int.TryParse(AppInfo.Current.BuildString, out var build)
+                ? build
+                : 0;
+
+        /// <summary>
+        /// Ramène un numéro de version à ses seuls chiffres, ex. « 1.1.3 ».
+        /// </summary>
+        /// <remarks>
+        /// Indispensable sur Windows en mode non empaqueté : AppInfo y renvoie la version
+        /// informationnelle de l'assembly, suffixée du hash du commit
+        /// (« 1.1.3+b5244f81ad... »). Comparée telle quelle au « 1.1.3 » du manifeste,
+        /// elle ne correspondait jamais — l'application proposait donc indéfiniment
+        /// une mise à jour déjà installée.
+        /// </remarks>
+        private static string NormaliserVersion(string? version)
+        {
+            if (string.IsNullOrWhiteSpace(version)) return "0.0.0";
+
+            // Retirer un eventuel suffixe semver : « 1.1.4+b5244f8 » ou « 1.1.4-preview ».
+            var coupe = version.Split('+', '-')[0].Trim();
+            if (coupe.Length == 0) return "0.0.0";
+
+            // Ne garder que Majeur.Mineur.Correctif : Windows ajoute une 4e composante
+            // (« 1.1.4.0 »), que le manifeste n'a pas. Sans cette troncature, la
+            // comparaison verrait deux versions differentes pour une même livraison.
+            var parties = coupe.Split('.');
+            return parties.Length > 3 ? string.Join('.', parties[0], parties[1], parties[2]) : coupe;
+        }
 
         /// <summary>
         /// Interroge le serveur et renvoie la mise à jour disponible, ou null si l'application
@@ -65,7 +130,16 @@ namespace StlExplorerClient.Services
         /// </summary>
         public static async Task<InfoMiseAJour?> VerifierAsync(HttpClient client, CancellationToken token = default)
         {
-            var manifeste = await client.GetFromJsonAsync<ManifesteMisesAJour>("/api/Update/manifest", token);
+            using var reponse = await client.GetAsync("/api/Update/manifest", token);
+
+            // 404 = aucun manifeste publié sur le serveur : ce n'est pas une erreur,
+            // simplement rien à proposer. Inutile d'alarmer l'utilisateur avec un
+            // message HTTP brut.
+            if (reponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return null;
+
+            reponse.EnsureSuccessStatusCode();
+            var manifeste = await reponse.Content.ReadFromJsonAsync<ManifesteMisesAJour>(cancellationToken: token);
 
             var publie = DeviceInfo.Platform == DevicePlatform.WinUI
                 ? manifeste?.Windows
@@ -87,11 +161,15 @@ namespace StlExplorerClient.Services
             if (publie.Build > 0 && BuildInstalle > 0)
                 return publie.Build > BuildInstalle;
 
-            if (Version.TryParse(publie.Version, out var versionPubliee)
-                && Version.TryParse(VersionInstallee, out var versionInstallee))
-                return versionPubliee > versionInstallee;
+            var versionPubliee = NormaliserVersion(publie.Version);
 
-            return !string.Equals(publie.Version, VersionInstallee, StringComparison.OrdinalIgnoreCase);
+            if (Version.TryParse(versionPubliee, out var publiee)
+                && Version.TryParse(VersionInstallee, out var installee))
+                return publiee > installee;
+
+            // Versions non comparables : ne rien proposer si elles sont identiques,
+            // pour ne jamais boucler sur une mise à jour déjà installée.
+            return !string.Equals(versionPubliee, VersionInstallee, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -114,7 +192,15 @@ namespace StlExplorerClient.Services
             if (System.IO.File.Exists(destination))
                 System.IO.File.Delete(destination);
 
-            using var reponse = await client.GetAsync(
+            // Client dédié : celui de l'application expire au bout de 30 s, ce qui suffit
+            // aux appels d'API mais pas au transfert d'un paquet de plusieurs dizaines de Mo.
+            using var clientTelechargement = new HttpClient(new HttpClientHandler { UseProxy = false })
+            {
+                BaseAddress = client.BaseAddress,
+                Timeout = TimeSpan.FromMinutes(30)
+            };
+
+            using var reponse = await clientTelechargement.GetAsync(
                 $"/api/Update/fichier/{Plateforme}", HttpCompletionOption.ResponseHeadersRead, token);
             reponse.EnsureSuccessStatusCode();
 
@@ -136,6 +222,95 @@ namespace StlExplorerClient.Services
             }
 
             return destination;
+        }
+
+        /// <summary>
+        /// Déroulé complet d'une mise à jour, utilisable depuis n'importe quelle page :
+        /// vérification, proposition, téléchargement puis installation.
+        /// </summary>
+        /// <param name="page">Page qui affiche les boîtes de dialogue.</param>
+        /// <param name="silencieux">
+        /// Vrai lors de la vérification automatique au démarrage : on ne dérange
+        /// l'utilisateur que si une mise à jour existe réellement.
+        /// </param>
+        /// <param name="journal">Reçoit les messages de suivi (journal de debug).</param>
+        /// <param name="progression">Reçoit l'avancement du téléchargement, entre 0 et 1.</param>
+        public static async Task VerifierEtProposerAsync(
+            Page page,
+            HttpClient client,
+            bool silencieux,
+            Action<string>? journal = null,
+            IProgress<double>? progression = null)
+        {
+            void Tracer(string message) => journal?.Invoke(message);
+
+            InfoMiseAJour? maj;
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+                maj = await VerifierAsync(client, cts.Token);
+            }
+            catch (Exception ex)
+            {
+                Tracer($"⚠ Vérification des mises à jour impossible : {ex.Message}");
+                if (!silencieux)
+                    await page.DisplayAlert("Mise à jour",
+                        "Impossible de contacter le serveur de mises à jour :\n" + ex.Message, "OK");
+                return;
+            }
+
+            if (maj == null)
+            {
+                Tracer($"✅ Application à jour (v{VersionInstallee}).");
+                if (!silencieux)
+                    await page.DisplayAlert("Mise à jour",
+                        $"Aucune mise à jour disponible.\nVersion installée : {VersionInstallee}.", "OK");
+                return;
+            }
+
+            Tracer($"⬆ Mise à jour disponible : v{maj.Version} (installée : v{VersionInstallee})");
+
+            var tailleMo = maj.Taille > 0 ? $"\nTaille : {maj.Taille / (1024.0 * 1024.0):F1} Mo" : "";
+            var notes = string.IsNullOrWhiteSpace(maj.Notes) ? "" : $"\n\n{maj.Notes}";
+            var question = $"Version {maj.Version} disponible "
+                         + $"(vous avez la {VersionInstallee}).{tailleMo}{notes}";
+
+            if (!await page.DisplayAlert("Mise à jour disponible", question, "Installer", "Plus tard"))
+                return;
+
+            // La veille de l'écran coupe le téléchargement en cours (le système suspend
+            // l'application et la connexion), ce qui laissait un paquet tronqué et une
+            // mise à jour en échec. On garde l'écran allumé le temps du transfert.
+            var veilleBloquee = false;
+            try
+            {
+                try
+                {
+                    DeviceDisplay.Current.KeepScreenOn = true;
+                    veilleBloquee = true;
+                }
+                catch (Exception ex)
+                {
+                    Tracer($"⚠ Impossible de bloquer la mise en veille : {ex.Message}");
+                }
+
+                Tracer($"📦 Téléchargement de la version {maj.Version}...");
+                var paquet = await TelechargerAsync(client, maj, progression);
+                Tracer($"📦 Téléchargé : {paquet}");
+                Installer(paquet);
+            }
+            catch (Exception ex)
+            {
+                Tracer($"❌ Mise à jour impossible : {ex.Message}");
+                await page.DisplayAlert("Erreur", "La mise à jour a échoué :\n" + ex.Message, "OK");
+            }
+            finally
+            {
+                if (veilleBloquee)
+                {
+                    try { DeviceDisplay.Current.KeepScreenOn = false; } catch { /* sans effet */ }
+                }
+            }
         }
 
         /// <summary>

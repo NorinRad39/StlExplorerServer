@@ -170,18 +170,17 @@ namespace StlExplorerClient
                     UseProxy = false
                 };
 
-                // Lire l'URL du serveur depuis les préférences (configurable dans la page Config)
-                var defaultUrl =
-#if ANDROID
-                    "http://10.0.2.2:5180";
-#else
-                    "http://localhost:5180";
-#endif
-                var serverUrl = Preferences.Get(ConfigPage.ServerUrlKey, defaultUrl).TrimEnd('/');
+                // Lire l'URL du serveur depuis les préférences (configurable dans la page Config).
+                // Par défaut : le nom de domaine du reverse proxy, valable depuis n'importe
+                // quel réseau — les anciennes valeurs (10.0.2.2 pour l'émulateur, localhost)
+                // ne fonctionnaient ni sur un vrai téléphone ni hors du PC serveur.
+                var serverUrl = Preferences.Get(ConfigPage.ServerUrlKey, ConfigPage.DefaultServerUrl)
+                                           .TrimEnd('/');
 
-#if ANDROID
-                handler.ServerCertificateCustomValidationCallback = (message, cert, chain, errors) => true;
-#endif
+                // Aucune dérogation sur la validation du certificat : le serveur est joint
+                // par son nom de domaine, dont le certificat est valide. Accepter n'importe
+                // quel certificat (ce que faisait l'ancienne version sur Android) exposait
+                // la session à une interception, y compris sur le réseau local.
                 _httpClient = new HttpClient(handler)
                 {
                     BaseAddress = new Uri(serverUrl + "/"),
@@ -202,16 +201,45 @@ namespace StlExplorerClient
             }
             catch (Exception ex)
             {
+                // Un échec de validation du certificat remonte sous forme d'exception
+                // imbriquée peu parlante : on le nomme explicitement pour éviter une
+                // longue enquête si le certificat expire ou si l'URL ne correspond pas.
+                var message = EstErreurCertificat(ex)
+                    ? "Certificat HTTPS refusé par le système.\n\n"
+                      + "Vérifie que l'adresse du serveur correspond bien au nom du certificat "
+                      + "et que celui-ci n'a pas expiré.\n\nDétail : " + ex.Message
+                    : "Impossible de contacter le serveur : " + ex.Message;
+
                 LogDebug($"❌ Erreur connexion serveur : {ex.Message}");
                 try
                 {
-                    await DisplayAlert("Erreur", "Impossible de contacter le serveur : " + ex.Message, "OK");
+                    await DisplayAlert("Erreur", message, "OK");
                 }
                 catch
                 {
                     System.Diagnostics.Debug.WriteLine($"Erreur serveur : {ex.Message}");
                 }
             }
+        }
+
+        /// <summary>
+        /// Indique si l'exception (ou l'une de ses causes) vient d'un refus de certificat TLS.
+        /// </summary>
+        private static bool EstErreurCertificat(Exception? ex)
+        {
+            for (; ex != null; ex = ex.InnerException)
+            {
+                if (ex is System.Security.Authentication.AuthenticationException)
+                    return true;
+
+                if (ex.Message.Contains("certificat", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("certificate", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("SSL", StringComparison.OrdinalIgnoreCase)
+                    || ex.Message.Contains("TLS", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
 
         /// <summary>
@@ -604,6 +632,13 @@ namespace StlExplorerClient
             var jeton = ++_apercuJeton;
 
             var modele = _allModeles.FirstOrDefault(m => m.Description == nomModele);
+
+            // Modèle courant retenu ici, donc sur toutes les plateformes. Il n'était
+            // affecté que dans UpdateWindowsActions(), qui sort immédiatement hors de
+            // Windows : sur Android il restait nul, et l'aperçu 3D était bloqué par sa
+            // propre garde « _modeleCourant == null » — le clic ne faisait rien.
+            _modeleCourant = modele;
+
             if (modele != null && _httpClient != null)
             {
                 try
@@ -1047,67 +1082,15 @@ namespace StlExplorerClient
         {
             if (_httpClient == null) return;
 
-            InfoMiseAJour? maj;
+            var progression = new Progress<double>(p =>
+                AfficherProgressionCopie(p, "Téléchargement de la mise à jour..."));
+
             try
             {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-                maj = await UpdateService.VerifierAsync(_httpClient, cts.Token);
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"⚠ Vérification des mises à jour impossible : {ex.Message}");
-                if (!silencieux)
-                    await DisplayAlert("Mise à jour",
-                        "Impossible de contacter le serveur de mises à jour :\n" + ex.Message, "OK");
-                return;
-            }
+                if (!silencieux) DefinirEtatCopie(true);
 
-            if (maj == null)
-            {
-                LogDebug($"✅ Application à jour (v{UpdateService.VersionInstallee}).");
-                if (!silencieux)
-                    await DisplayAlert("Mise à jour",
-                        $"L'application est à jour (version {UpdateService.VersionInstallee}).", "OK");
-                return;
-            }
-
-            LogDebug($"⬆ Mise à jour disponible : v{maj.Version} (installée : v{UpdateService.VersionInstallee})");
-
-            var tailleMo = maj.Taille > 0 ? $"\nTaille : {maj.Taille / (1024.0 * 1024.0):F1} Mo" : "";
-            var notes = string.IsNullOrWhiteSpace(maj.Notes) ? "" : $"\n\n{maj.Notes}";
-            var question = $"Version {maj.Version} disponible "
-                         + $"(vous avez la {UpdateService.VersionInstallee}).{tailleMo}{notes}";
-
-            if (!await DisplayAlert("Mise à jour disponible", question, "Installer", "Plus tard"))
-                return;
-
-            await TelechargerEtInstallerAsync(maj);
-        }
-
-        /// <summary>
-        /// Télécharge le paquet de mise à jour en affichant la progression, puis lance
-        /// l'installation (installateur système sur Android, setup silencieux sur Windows).
-        /// </summary>
-        private async Task TelechargerEtInstallerAsync(InfoMiseAJour maj)
-        {
-            try
-            {
-                DefinirEtatCopie(true);
-                AfficherProgressionCopie(0, $"Téléchargement de la version {maj.Version}...");
-
-                var progression = new Progress<double>(p =>
-                    AfficherProgressionCopie(p, $"Téléchargement de la version {maj.Version}..."));
-
-                var paquet = await UpdateService.TelechargerAsync(_httpClient!, maj, progression);
-                LogDebug($"📦 Mise à jour téléchargée : {paquet}");
-
-                AfficherProgressionCopie(1, "Lancement de l'installation...");
-                UpdateService.Installer(paquet);
-            }
-            catch (Exception ex)
-            {
-                LogDebug($"❌ Mise à jour impossible : {ex.Message}");
-                await DisplayAlert("Erreur", "La mise à jour a échoué :\n" + ex.Message, "OK");
+                await UpdateService.VerifierEtProposerAsync(
+                    this, _httpClient, silencieux, LogDebug, progression);
             }
             finally
             {

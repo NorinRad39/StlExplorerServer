@@ -162,12 +162,54 @@ function centerAndFit(obj) {
 const mat = new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.25, roughness: 0.65 });
 const AIDE = 'Clic gauche = rotation · Clic droit = panoramique · Molette = zoom';
 
+// ------------------------------------------------------------------
+// Suivi du telechargement : pourcentage, volumes et debit.
+// Un fichier 3D peut peser plusieurs centaines de Mo ; sans retour visuel,
+// l'attente est indistinguable d'un blocage.
+// ------------------------------------------------------------------
+function formaterOctets(octets) {
+  if (!isFinite(octets) || octets < 0) return '?';
+  if (octets < 1024) return octets + ' o';
+  if (octets < 1024 * 1024) return (octets / 1024).toFixed(0) + ' Ko';
+  if (octets < 1024 * 1024 * 1024) return (octets / (1024 * 1024)).toFixed(1) + ' Mo';
+  return (octets / (1024 * 1024 * 1024)).toFixed(2) + ' Go';
+}
+
+function creerSuiviTelechargement() {
+  const debut = performance.now();
+  let dernierAffichage = 0;
+
+  return function (evenement) {
+    const maintenant = performance.now();
+    // Limiter les mises a jour : le rendu du texte ne doit pas freiner le transfert.
+    if (maintenant - dernierAffichage < 150 && evenement.loaded !== evenement.total) return;
+    dernierAffichage = maintenant;
+
+    const secondes = (maintenant - debut) / 1000;
+    const debit = secondes > 0 ? evenement.loaded / secondes : 0;
+    const vitesse = formaterOctets(debit) + '/s';
+
+    // La taille totale n'est connue que si le serveur annonce un Content-Length
+    // (ce qu'il fait desormais, y compris pour un fichier extrait d'une archive).
+    if (evenement.lengthComputable && evenement.total > 0) {
+      const pourcent = Math.floor((evenement.loaded / evenement.total) * 100);
+      reportLog('Telechargement ' + pourcent + ' %  ·  '
+        + formaterOctets(evenement.loaded) + ' / ' + formaterOctets(evenement.total)
+        + '  ·  ' + vitesse, false);
+    } else {
+      reportLog('Telechargement  ·  ' + formaterOctets(evenement.loaded)
+        + '  ·  ' + vitesse, false);
+    }
+  };
+}
+
 window.loadModel = function (url, extension) {
   reportLog('Telechargement du fichier 3D...', false);
   clearMeshes();
   ajusterTaille();
 
   const ext = (extension || '').toLowerCase();
+  const onProgress = creerSuiviTelechargement();
   const onError = function (err) {
     const detail = err && (err.message || err.type || err.status) ? (err.message || err.type || err.status) : err;
     reportLog('Chargement du fichier 3D echoue : ' + detail, true);
@@ -176,22 +218,29 @@ window.loadModel = function (url, extension) {
     ajusterTaille();
     reportLog(AIDE, false);
   };
+  const surAnalyse = function () {
+    // Entre la fin du transfert et l'affichage, le decodage d'un gros maillage
+    // peut prendre plusieurs secondes : on le dit plutot que de figer l'ecran.
+    reportLog('Analyse du modele...', false);
+  };
 
   if (ext === '.stl') {
     new STLLoader().load(url, function (geometry) {
+      surAnalyse();
       geometry.computeVertexNormals();
       const mesh = new THREE.Mesh(geometry, mat);
       scene.add(mesh);
       centerAndFit(mesh);
       onLoaded();
-    }, undefined, onError);
+    }, onProgress, onError);
   } else if (ext === '.obj') {
     new OBJLoader().load(url, function (group) {
+      surAnalyse();
       group.traverse(c => { if (c.isMesh) c.material = mat; });
       scene.add(group);
       centerAndFit(group);
       onLoaded();
-    }, undefined, onError);
+    }, onProgress, onError);
   } else {
     reportLog('Extension non geree par l\'apercu 3D : ' + ext, true);
   }

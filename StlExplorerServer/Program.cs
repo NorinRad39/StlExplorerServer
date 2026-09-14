@@ -6,25 +6,41 @@ using StlExplorerServer.Services;
 #region Initialisation de l'Application
 
 /// <summary>
-/// Point d'entrée de l'application Web.
-/// La méthode CreateBuilder prépare l'application en chargeant notamment la configuration 
-/// (fichiers appsettings.json), les variables d'environnement, et met en place le conteneur de dépendances.
+/// Point d'entrï¿½e de l'application Web.
+/// La mï¿½thode CreateBuilder prï¿½pare l'application en chargeant notamment la configuration 
+/// (fichiers appsettings.json), les variables d'environnement, et met en place le conteneur de dï¿½pendances.
 /// </summary>
 var builder = WebApplication.CreateBuilder(args);
 
 #endregion
 
-#region Configuration des Services (Injection de Dépendances)
+#region Configuration des Services (Injection de Dï¿½pendances)
 
 /// <summary>
-/// Le conteneur d'Injection de Dépendances (DI - Dependency Injection) permet d'enregistrer toutes les 
-/// briques matérielles ou logicielles (Services) dont notre application aura besoin.
-/// Lorsque un contrôleur demandera un service, ASP.NET Core le lui fournira automatiquement.
+/// Le conteneur d'Injection de Dï¿½pendances (DI - Dependency Injection) permet d'enregistrer toutes les 
+/// briques matï¿½rielles ou logicielles (Services) dont notre application aura besoin.
+/// Lorsque un contrï¿½leur demandera un service, ASP.NET Core le lui fournira automatiquement.
 /// </summary>
 
-// Ajoute les services nécessaires pour explorer et générer la documentation Swagger/OpenAPI (interface de test d'API).
+// Ajoute les services nï¿½cessaires pour explorer et gï¿½nï¿½rer la documentation Swagger/OpenAPI (interface de test d'API).
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+/// <summary>
+/// Limites de dÃ©bit de Kestrel.
+/// </summary>
+/// <remarks>
+/// Par dÃ©faut, Kestrel interrompt une rÃ©ponse dont le dÃ©bit tombe sous 240 octets/s
+/// et applique la mÃªme rÃ¨gle aux corps de requÃªte. Ce garde-fou vise les attaques par
+/// connexions lentes ; ici il pÃ©nalise les usages lÃ©gitimes : tÃ©lÃ©chargement d'un STL
+/// de plusieurs centaines de Mo via le VPN, ou tÃ©lÃ©versement d'un dossier complet
+/// depuis un poste distant. Le serveur n'Ã©tant pas exposÃ© sur Internet, on le dÃ©sactive.
+/// </remarks>
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MinResponseDataRate = null;
+    options.Limits.MinRequestBodyDataRate = null;
+});
 
 // Demande au framework de rechercher tous les "Controllers" dans le projet pour les activer.
 builder.Services.AddControllers()
@@ -35,33 +51,33 @@ builder.Services.AddControllers()
     });
 
 /// <summary>
-/// Enregistrement de nos propres services métiers avec la méthode AddScoped.
-/// "Scoped" signifie qu'une nouvelle instance du service est créée *pour chaque requête HTTP*.
-/// C'est idéal pour les applications web.
+/// Enregistrement de nos propres services mï¿½tiers avec la mï¿½thode AddScoped.
+/// "Scoped" signifie qu'une nouvelle instance du service est crï¿½ï¿½e *pour chaque requï¿½te HTTP*.
+/// C'est idï¿½al pour les applications web.
 /// </summary>
 /// <remarks>
-/// On associe une Interface (ex: IFolderScannerService) à son Implémentation réelle (ex: FolderScannerService).
-/// Cela permet une meilleure flexibilité et d'écrire des tests informatiques plus facilement.
+/// On associe une Interface (ex: IFolderScannerService) ï¿½ son Implï¿½mentation rï¿½elle (ex: FolderScannerService).
+/// Cela permet une meilleure flexibilitï¿½ et d'ï¿½crire des tests informatiques plus facilement.
 /// </remarks>
 builder.Services.AddScoped<IFolderScannerService, FolderScannerService>();
 builder.Services.AddScoped<IMetadonneesRepository, MetadataRepository>();
 
-// Service hébergé (singleton) pour le scan en arrière-plan, la surveillance FileSystemWatcher
-// et la gestion sécurisée des scopes DI (résout le problème de DbContext disposé).
+// Service hï¿½bergï¿½ (singleton) pour le scan en arriï¿½re-plan, la surveillance FileSystemWatcher
+// et la gestion sï¿½curisï¿½e des scopes DI (rï¿½sout le problï¿½me de DbContext disposï¿½).
 builder.Services.AddSingleton<BackgroundScannerHostedService>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<BackgroundScannerHostedService>());
 
 #endregion
 
-#region Configuration de la Base de Données (Entity Framework)
+#region Configuration de la Base de Donnï¿½es (Entity Framework)
 
 /// <summary>
-/// Configuration du contexte de la base de données (Le lien entre notre code C# et la vraie base de données).
+/// Configuration du contexte de la base de donnï¿½es (Le lien entre notre code C# et la vraie base de donnï¿½es).
 /// </summary>
 /// <remarks>
-/// Ici, on utilise la librairie Pomelo pour se connecter à une base de données MySQL ou MariaDB.
-/// La chaîne de connexion (DefaultConnection) est récupérée automatiquement depuis le fichier `appsettings.json`.
-/// ServerVersion.AutoDetect permet à Entity Framework de s'adapter automatiquement à la version précise de votre serveur de base de données.
+/// Ici, on utilise la librairie Pomelo pour se connecter ï¿½ une base de donnï¿½es MySQL ou MariaDB.
+/// La chaï¿½ne de connexion (DefaultConnection) est rï¿½cupï¿½rï¿½e automatiquement depuis le fichier `appsettings.json`.
+/// ServerVersion.AutoDetect permet ï¿½ Entity Framework de s'adapter automatiquement ï¿½ la version prï¿½cise de votre serveur de base de donnï¿½es.
 /// </remarks>
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseMySql(
@@ -78,20 +94,20 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 #region Configuration des Logs (Journalisation)
 
 /// <summary>
-/// Les Logs permettent d'écrire du texte dans la console pour savoir ce que fait le serveur
-/// en temps réel (pratique pour voir les requêtes SQL générées ou les erreurs d'exécution).
+/// Les Logs permettent d'ï¿½crire du texte dans la console pour savoir ce que fait le serveur
+/// en temps rï¿½el (pratique pour voir les requï¿½tes SQL gï¿½nï¿½rï¿½es ou les erreurs d'exï¿½cution).
 /// </summary>
-builder.Logging.ClearProviders(); // Nettoie les configurations de logs par défaut
+builder.Logging.ClearProviders(); // Nettoie les configurations de logs par dï¿½faut
 builder.Logging.AddConsole();     // Affiche les messages directement dans la console noire
-builder.Logging.AddDebug();       // Affiche les messages dans la fenêtre "Sortie" de Visual Studio
+builder.Logging.AddDebug();       // Affiche les messages dans la fenï¿½tre "Sortie" de Visual Studio
 
 #endregion
 
 #region Fichier de configuration modifiable (compatible Docker)
 
-// Le fichier appsettings.json est intégré dans l'image Docker et est en lecture seule.
-// On ajoute un fichier de surcharge modifiable dans un répertoire monté en volume (/app/config/).
-// Ce fichier a la priorité la plus haute dans la chaîne de configuration ASP.NET Core.
+// Le fichier appsettings.json est intï¿½grï¿½ dans l'image Docker et est en lecture seule.
+// On ajoute un fichier de surcharge modifiable dans un rï¿½pertoire montï¿½ en volume (/app/config/).
+// Ce fichier a la prioritï¿½ la plus haute dans la chaï¿½ne de configuration ASP.NET Core.
 var overrideConfigDir = Path.Combine(Directory.GetCurrentDirectory(), "config");
 Directory.CreateDirectory(overrideConfigDir);
 var overrideConfigPath = Path.Combine(overrideConfigDir, "override.json");
@@ -104,36 +120,36 @@ builder.Configuration.AddJsonFile(overrideConfigPath, optional: true, reloadOnCh
 #region Construction et Configuration du Pipeline HTTP
 
 /// <summary>
-/// C'est à ce moment que l'application valide tous les services enregistrés plus haut et crée
-/// l'instance de l'application web (app) prête à configurer comment les requêtes web seront traitées.
+/// C'est ï¿½ ce moment que l'application valide tous les services enregistrï¿½s plus haut et crï¿½e
+/// l'instance de l'application web (app) prï¿½te ï¿½ configurer comment les requï¿½tes web seront traitï¿½es.
 /// </summary>
 var app = builder.Build();
 
-// Les migrations EF Core seront gérées par BackgroundScannerHostedService à la place.
+// Les migrations EF Core seront gï¿½rï¿½es par BackgroundScannerHostedService ï¿½ la place.
 
 /* 
  * PIPELINE MIDDLEWARES : 
- * Tout ce qui suit "app." configure la façon dont une requête HTTP traversera le serveur (le canal ou Pipeline). 
- * L'ordre de ces déclarations est TRÈS important.
+ * Tout ce qui suit "app." configure la faï¿½on dont une requï¿½te HTTP traversera le serveur (le canal ou Pipeline). 
+ * L'ordre de ces dï¿½clarations est TRï¿½S important.
  */
 
-// Si l'application tourne sur votre machine locale (en mode développement), on affiche la page Swagger
+// Si l'application tourne sur votre machine locale (en mode dï¿½veloppement), on affiche la page Swagger
 if (app.Environment.IsDevelopment())
 {
-    // Permet de générer le fichier JSON de l'API
+    // Permet de gï¿½nï¿½rer le fichier JSON de l'API
     app.UseSwagger();
-    // Génère l'interface web graphique conviviale accessible depuis votre navigateur web
+    // Gï¿½nï¿½re l'interface web graphique conviviale accessible depuis votre navigateur web
     app.UseSwaggerUI();
 }
 
-// Redirige automatiquement toutes les requêtes http://... non sécurisées vers https://... (Sécurité)
-// Commenté ici si le HTTPS (certificat SSL) n'est pas configuré sur votre environnement de test local.
+// Redirige automatiquement toutes les requï¿½tes http://... non sï¿½curisï¿½es vers https://... (Sï¿½curitï¿½)
+// Commentï¿½ ici si le HTTPS (certificat SSL) n'est pas configurï¿½ sur votre environnement de test local.
 //app.UseHttpsRedirection();
 
-// Sert les fichiers statiques depuis le dossier wwwroot (ex: viewer3d.html pour la prévisualisation 3D)
+// Sert les fichiers statiques depuis le dossier wwwroot (ex: viewer3d.html pour la prï¿½visualisation 3D)
 app.UseStaticFiles();
 
-// Demande à l'application d'analyser l'URL entrante pour l'envoyer au bon contrôleur (ex: /api/Metadata)
+// Demande ï¿½ l'application d'analyser l'URL entrante pour l'envoyer au bon contrï¿½leur (ex: /api/Metadata)
 app.MapControllers();
 
 #endregion
@@ -141,8 +157,8 @@ app.MapControllers();
 #region Lancement de l'Application
 
 /// <summary>
-/// Démarre l'application. À partir de cette ligne, le serveur écoute les requêtes HTTP entrantes 
-/// en boucle indéfiniment jusqu'à ce qu'on le stoppe manuellement.
+/// Dï¿½marre l'application. ï¿½ partir de cette ligne, le serveur ï¿½coute les requï¿½tes HTTP entrantes 
+/// en boucle indï¿½finiment jusqu'ï¿½ ce qu'on le stoppe manuellement.
 /// </summary>
 app.Run();
 

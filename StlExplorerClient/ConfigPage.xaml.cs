@@ -5,7 +5,14 @@ namespace StlExplorerClient
     public partial class ConfigPage : ContentPage
     {
         public const string ServerUrlKey = "ServerUrl";
-        public const string DefaultServerUrl = "http://localhost:5180";
+
+        /// <summary>
+        /// Adresse utilisée tant que l'utilisateur n'en a pas saisi d'autre.
+        /// Le nom de domaine passe par le reverse proxy du NAS (HTTPS) et fonctionne
+        /// aussi bien depuis le réseau local que depuis l'extérieur, contrairement à
+        /// une adresse IP privée.
+        /// </summary>
+        public const string DefaultServerUrl = "https://stl.file4all.fr";
 
         private readonly HttpClient? _httpClient;
         private List<string> _dossiers = new();
@@ -22,31 +29,39 @@ namespace StlExplorerClient
             if (DeviceInfo.Platform == DevicePlatform.WinUI)
                 BtnParcourir.IsVisible = true;
 
-            VersionLabel.Text = $"Version installée : {AppInfo.Current.VersionString} "
-                              + $"(build {AppInfo.Current.BuildString})";
+            // Même source que la vérification de mise à jour : AppInfo est trompeur
+            // sur Windows non empaqueté (il renvoie 1.0.0.1 quelle que soit la build).
+            VersionLabel.Text = $"Version installée : {StlExplorerClient.Services.UpdateService.VersionInstallee}";
 
             ChargerConfiguration();
         }
 
         /// <summary>
         /// Vérifie manuellement la présence d'une nouvelle version publiée sur le NAS.
-        /// La logique (comparaison, téléchargement, installation) vit dans MainPage,
-        /// qui possède déjà la barre de progression et le journal de debug.
+        /// Le déroulé complet est autonome (UpdateService) : il ne dépend plus de la pile
+        /// de navigation, qui n'expose pas MainPage de la même façon sur toutes les plateformes.
         /// </summary>
         private async void OnVerifierMajClicked(object sender, EventArgs e)
         {
-            var page = Navigation.NavigationStack.FirstOrDefault(p => p is MainPage) as MainPage;
-            if (page == null)
+            if (_httpClient == null)
             {
-                await DisplayAlert("Mise à jour", "Page principale introuvable.", "OK");
+                await DisplayAlert("Mise à jour", "Client HTTP non initialisé.", "OK");
                 return;
             }
 
             try
             {
                 BtnVerifierMaj.IsEnabled = false;
-                await Navigation.PopAsync();          // revenir sur MainPage pour voir la progression
-                await page.VerifierMisesAJourAsync(silencieux: false);
+                StatusLabel.TextColor = Color.FromArgb("#E0E0E0");
+                StatusLabel.Text = "Vérification des mises à jour...";
+
+                var progression = new Progress<double>(p =>
+                    StatusLabel.Text = $"Téléchargement de la mise à jour... {(int)(p * 100)} %");
+
+                await StlExplorerClient.Services.UpdateService.VerifierEtProposerAsync(
+                    this, _httpClient, silencieux: false,
+                    journal: m => StatusLabel.Text = m,
+                    progression: progression);
             }
             finally
             {
@@ -67,11 +82,28 @@ namespace StlExplorerClient
             // S'assurer que l'URL se termine sans slash pour la cohérence
             url = url.TrimEnd('/');
 
-            if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var adresse))
             {
                 UrlStatusLabel.TextColor = Colors.Red;
                 UrlStatusLabel.Text = "URL invalide. Utilisez le format http://ip:port";
                 return;
+            }
+
+            // Le trafic en HTTP circule en clair : acceptable sur le réseau local, mais
+            // autant signaler qu'une adresse HTTPS existe (le reverse proxy du NAS).
+            if (adresse.Scheme == Uri.UriSchemeHttp)
+            {
+                var continuer = await DisplayAlert("Connexion non chiffrée",
+                    $"« {url} » utilise HTTP : les échanges avec le serveur circuleront en clair.\n\n"
+                    + $"L'adresse sécurisée est {DefaultServerUrl}.\n\nUtiliser quand même HTTP ?",
+                    "Utiliser HTTP", "Annuler");
+
+                if (!continuer)
+                {
+                    UrlStatusLabel.TextColor = Color.FromArgb("#FFB74D");
+                    UrlStatusLabel.Text = "Enregistrement annulé.";
+                    return;
+                }
             }
 
             Preferences.Set(ServerUrlKey, url);

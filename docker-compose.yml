@@ -1,3 +1,5 @@
+# Les secrets ne figurent plus ici : docker compose lit le fichier .env place
+# a cote de ce compose (voir .env.exemple). Ne jamais committer le .env.
 services:
   # ── Base de données MariaDB ──
   # network_mode: host → le conteneur partage directement le réseau du NAS.
@@ -9,10 +11,10 @@ services:
     restart: unless-stopped
     network_mode: host
     environment:
-      MYSQL_ROOT_PASSWORD: "Zoro!Magnus!39"
-      MYSQL_DATABASE: "StlExplorerServer"
-      MYSQL_USER: "florent"
-      MYSQL_PASSWORD: "Zoro!Magnus!39"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_DATABASE: "${MYSQL_DATABASE}"
+      MYSQL_USER: "${MYSQL_USER}"
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD}"
       MYSQL_TCP_PORT: "3307"
     volumes:
       - mariadb_data:/var/lib/mysql
@@ -41,7 +43,7 @@ services:
     environment:
       # En mode host, les deux conteneurs partagent le réseau du NAS.
       # MariaDB écoute sur 127.0.0.1:3307 (MYSQL_TCP_PORT=3307).
-      ConnectionStrings__DefaultConnection: "Server=127.0.0.1;Port=3307;Database=StlExplorerServer;User=florent;Password=Zoro!Magnus!39;Connect Timeout=60;"
+      ConnectionStrings__DefaultConnection: "Server=127.0.0.1;Port=3307;Database=StlExplorerServer;User=${MYSQL_USER};Password=${MYSQL_PASSWORD};Connect Timeout=60;"
       ScannerSettings__RootDirectories__0: "/data/3D_Maquettes"
       # En mode host, pas de mapping de ports : l'API écoute directement sur le port 5180 du NAS.
       ASPNETCORE_URLS: "http://+:5180"

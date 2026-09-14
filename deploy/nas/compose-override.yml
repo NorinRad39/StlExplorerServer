@@ -1,0 +1,10 @@
+# Surcouche Compose appliquee par stlexplorer-autoupdate.sh, en plus du fichier
+# du projet Container Manager (docker compose -f projet.yml -f compose-override.yml).
+#
+# Elle ajoute le montage du dossier de mises a jour sans modifier le fichier du
+# projet : inutile d'arreter puis de modifier le projet dans Container Manager.
+# Les listes "volumes" de deux fichiers Compose sont fusionnees.
+services:
+  stlexplorer-api:
+    volumes:
+      - /volume1/Applications/STLExplorer:/data/updates:ro

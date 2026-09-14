@@ -370,3 +370,9 @@ FodyWeavers.xsd
 *.apk
 *.aab
 *.tar
+
+# Secrets de renouvellement du certificat (jeton Cloudflare, mot de passe DSM)
+secrets-certificat.env
+
+# Secrets de la pile Docker (mots de passe MariaDB) - voir .env.exemple
+.env

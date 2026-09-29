@@ -27,6 +27,10 @@
 .PARAMETER Sauf
     Cibles a ignorer : serveur, android, windows.
 
+.PARAMETER SansCommit
+    Publie sans commiter ni pousser le depot. Par defaut, un deploiement reussi
+    est commite puis pousse, pour que le depot reflete le code publie.
+
 .EXAMPLE
     .\deploy\deploy-tout.ps1 -Notes "Apercu 3D corrige sur Android"
     Publie tout en incrementant automatiquement (1.1.1 -> 1.1.2).
@@ -43,7 +47,8 @@ param(
     [ValidateSet("patch", "minor", "major")] [string]$Increment = "patch",
     [switch]$SansIncrement,
     [string]$Notes = "",
-    [ValidateSet("serveur", "android", "windows")] [string[]]$Sauf = @()
+    [ValidateSet("serveur", "android", "windows")] [string[]]$Sauf = @(),
+    [switch]$SansCommit
 )
 
 . "$PSScriptRoot\_commun.ps1"
@@ -74,7 +79,8 @@ $resultats = @()
 foreach ($cible in $cibles) {
     $script = Join-Path $PSScriptRoot "deploy-$cible.ps1"
 
-    $parametres = @{ Notes = $Notes }
+    # Un seul commit en fin de deploiement, pas un par cible.
+    $parametres = @{ Notes = $Notes; SansCommit = $true }
     if ($Version) {
         $parametres.Version = $Version
         # Le serveur n'a pas de numero de build (il ne lit pas le csproj).
@@ -99,3 +105,18 @@ foreach ($cible in $cibles) {
 
 Write-Etape "Recapitulatif"
 $resultats | Format-Table -AutoSize
+
+$echecs = @($resultats | Where-Object { $_.Statut -ne "OK" })
+
+if ($SansCommit) {
+    Write-Info "Commit et push ignores (-SansCommit)."
+} elseif ($echecs.Count -gt 0 -or $resultats.Count -lt $cibles.Count) {
+    # Publication incomplete : commiter maintenant enregistrerait un numero de version
+    # qui ne correspond a aucune livraison complete.
+    Write-Avert "Deploiement incomplet : rien n'est commite."
+} else {
+    $versionFinale = (Get-VersionClient).Version
+    $titre = if ($Notes) { "Deploiement $versionFinale : $Notes" } else { "Deploiement $versionFinale" }
+    Invoke-CommitEtPush -Titre $titre -Details ("Cibles publiees : " + ($cibles -join ", "))
+}
+

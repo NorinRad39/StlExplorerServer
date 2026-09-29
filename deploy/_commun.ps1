@@ -257,3 +257,74 @@ function Remove-AnciensPaquets {
 function Format-Mo($octets) {
     return "{0:N1} Mo" -f ($octets / 1MB)
 }
+
+<#
+    Commite l'etat du depot puis le pousse, apres une publication reussie.
+
+    Le commit enregistre exactement les sources qui viennent d'etre publiees
+    (y compris le numero de version incremente dans le csproj) : on sait ainsi
+    toujours quel code tourne sur les appareils.
+
+    Un echec de commit ou de push n'annule pas la publication, deja faite :
+    il est signale, et il suffira de pousser a la main.
+#>
+function Invoke-CommitEtPush {
+    param(
+        [Parameter(Mandatory)] [string]$Titre,
+        [string]$Details = ""
+    )
+
+    Write-Etape "Commit et push du depot"
+
+    Push-Location $script:RacineDepot
+    $ancienne = $ErrorActionPreference
+    # git ecrit sa progression sur stderr : sans cela, 'Stop' en ferait une erreur fatale.
+    $ErrorActionPreference = "Continue"
+
+    try {
+        git add -A 2>&1 | Out-Null
+
+        # Garde-fou independant du .gitignore : aucun fichier de secrets ne doit
+        # partir sur GitHub, meme si une regle d'exclusion venait a disparaitre.
+        $indexes = @(git diff --cached --name-only 2>$null | Where-Object { $_ })
+        $sensibles = @($indexes | Where-Object {
+            ($_ -match '(^|/)\.env$') -or ($_ -match '(^|/)secrets[^/]*\.env$')
+        })
+        if ($sensibles.Count -gt 0) {
+            git reset -q 2>&1 | Out-Null
+            Write-Host "[ECHEC] Fichiers sensibles dans l'index, commit annule :" -ForegroundColor Red
+            $sensibles | ForEach-Object { Write-Host "        $_" -ForegroundColor Red }
+            return
+        }
+
+        if ($indexes.Count -eq 0) {
+            Write-Info "Aucune modification a commiter."
+            return
+        }
+
+        # Deux -m : le premier devient le titre, le second le corps du message.
+        if ($Details) {
+            git commit -q -m $Titre -m $Details 2>&1 | Out-Null
+        } else {
+            git commit -q -m $Titre 2>&1 | Out-Null
+        }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Avert "Le commit a echoue (code $LASTEXITCODE) : les fichiers restent indexes."
+            return
+        }
+        Write-Ok ("Commit {0} : {1} ({2} fichier(s))" -f (git rev-parse --short HEAD), $Titre, $indexes.Count)
+
+        git push -q 2>&1 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Avert "Le push a echoue (code $LASTEXITCODE) : le commit est local."
+            Write-Info "Pousse-le a la main avec « git push » une fois le probleme regle."
+            return
+        }
+        Write-Ok "Pousse vers $(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null)"
+    }
+    finally {
+        $ErrorActionPreference = $ancienne
+        Pop-Location
+    }
+}
+

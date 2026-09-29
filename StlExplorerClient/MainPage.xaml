@@ -244,6 +244,36 @@
                 Clicked="OnActualiserBaseClicked" />
                 </HorizontalStackLayout>
 
+                <!-- Zone de dépôt (Windows) : glisser un ou plusieurs dossiers depuis
+                     l'Explorateur, même effet que le bouton « Téléverser un dossier ».
+                     Visible dans les mêmes conditions que ce bouton. -->
+                <Border x:Name="ZoneDepotDossier"
+                        IsVisible="False"
+                        Stroke="#00695C"
+                        StrokeThickness="2"
+                        StrokeDashArray="6,4"
+                        BackgroundColor="#1A2B29"
+                        Padding="15,18"
+                        HorizontalOptions="Fill"
+                        MaximumWidthRequest="445">
+                    <Border.StrokeShape>
+                        <RoundRectangle CornerRadius="6" />
+                    </Border.StrokeShape>
+                    <Border.GestureRecognizers>
+                        <DropGestureRecognizer AllowDrop="True"
+                                               DragOver="OnDossierDragOver"
+                                               DragLeave="OnDossierDragLeave"
+                                               Drop="OnDossierDrop" />
+                    </Border.GestureRecognizers>
+                    <!-- InputTransparent : le dépôt doit atterrir sur la bordure, pas sur le texte -->
+                    <Label x:Name="ZoneDepotLabel"
+                           InputTransparent="True"
+                           Text="📂  … ou glissez un dossier ici"
+                           TextColor="#80CBC4"
+                           FontSize="13"
+                           HorizontalTextAlignment="Center" />
+                </Border>
+
                 <!-- Progression d'une copie de fichiers ou de dossier -->
                 <Border x:Name="UploadProgressPanel"
                         IsVisible="False"

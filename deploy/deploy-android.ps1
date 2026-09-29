@@ -34,7 +34,8 @@ param(
     [ValidateSet("patch", "minor", "major")] [string]$Increment = "patch",
     [switch]$SansIncrement,
     [int]$Build = 0,
-    [string]$Notes = ""
+    [string]$Notes = "",
+    [switch]$SansCommit
 )
 
 . "$PSScriptRoot\_commun.ps1"
@@ -86,3 +87,8 @@ Remove-AnciensPaquets -Dossier $DossierAndroid -Filtre "STLExplorer-*.apk"
 
 Write-Etape "Termine"
 Write-Host "Les apps Android installees proposeront la version $($infos.Version) a leur prochain demarrage."
+
+if (-not $SansCommit) {
+    $titre = if ($Notes) { "Deploiement Android $($infos.Version)" + " : $Notes" } else { "Deploiement Android $($infos.Version)" }
+    Invoke-CommitEtPush -Titre $titre
+}

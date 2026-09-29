@@ -820,6 +820,9 @@ namespace StlExplorerClient
                                           && !string.IsNullOrWhiteSpace(sujet)
                                           && string.IsNullOrWhiteSpace(modele);
 
+            // La zone de glisser-déposer suit exactement le bouton : même action, même condition.
+            ZoneDepotDossier.IsVisible = BtnTeleverserDossier.IsVisible;
+
             if (champsPleins)
             {
                 // Vérifier si cette combinaison exacte existe dans les données chargées
@@ -1320,11 +1323,131 @@ namespace StlExplorerClient
         }
 #endif
 
+        // ============================================
+        // Glisser-déposer de dossiers (Windows)
+        // ============================================
+
+        // Évite qu'un second dépôt ne lance une copie concurrente de la première.
+        private bool _televersementEnCours;
+
+        /// <summary>
+        /// Survol de la zone de dépôt : accepte les éléments venant de l'Explorateur.
+        /// </summary>
+        /// <remarks>
+        /// MAUI n'accepte d'office que ses propres glisser-déposer internes : pour des
+        /// fichiers venant de l'Explorateur Windows, il faut accepter explicitement
+        /// l'opération sur l'évènement natif, sinon le curseur reste « interdit ».
+        /// </remarks>
+        private void OnDossierDragOver(object? sender, DragEventArgs e)
+        {
+#if WINDOWS
+            var natif = e.PlatformArgs?.DragEventArgs;
+            if (natif == null || _televersementEnCours
+                || !natif.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
+            {
+                e.AcceptedOperation = Microsoft.Maui.Controls.DataPackageOperation.None;
+                return;
+            }
+
+            natif.AcceptedOperation = Windows.ApplicationModel.DataTransfer.DataPackageOperation.Copy;
+            e.AcceptedOperation = Microsoft.Maui.Controls.DataPackageOperation.Copy;
+
+            if (natif.DragUIOverride != null)
+            {
+                natif.DragUIOverride.Caption = $"Téléverser dans {FamilleEntry.Text?.Trim()} › {SujetEntry.Text?.Trim()}";
+                natif.DragUIOverride.IsCaptionVisible = true;
+            }
+
+            SurlignerZoneDepot(true);
+#endif
+        }
+
+        private void OnDossierDragLeave(object? sender, DragEventArgs e) => SurlignerZoneDepot(false);
+
+        /// <summary>
+        /// Dépôt d'un ou plusieurs dossiers : chacun est téléversé à la suite, avec
+        /// la même confirmation que le bouton « Téléverser un dossier ».
+        /// </summary>
+        private async void OnDossierDrop(object? sender, DropEventArgs e)
+        {
+            SurlignerZoneDepot(false);
+#if WINDOWS
+            var natif = e.PlatformArgs?.DragEventArgs;
+            if (natif == null || _televersementEnCours) return;
+            if (!natif.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems)) return;
+
+            e.Handled = true;
+
+            // Le report garde les données du glisser-déposer valides pendant la lecture
+            // asynchrone. Il est libéré dès la liste obtenue : le conserver pendant toute
+            // la copie figerait l'Explorateur jusqu'à la fin du téléversement.
+            List<string> dossiers;
+            var report = natif.GetDeferral();
+            try
+            {
+                var elements = await natif.DataView.GetStorageItemsAsync();
+                dossiers = elements
+                    .Where(el => el.IsOfType(Windows.Storage.StorageItemTypes.Folder))
+                    .Select(el => el.Path)
+                    .Where(chemin => !string.IsNullOrWhiteSpace(chemin))
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                LogDebug($"❌ Lecture du dépôt impossible : {ex.Message}");
+                return;
+            }
+            finally
+            {
+                report.Complete();
+            }
+
+            if (dossiers.Count == 0)
+            {
+                await DisplayAlert("Téléverser un dossier",
+                    "Déposez un dossier, pas un fichier.\n"
+                    + "Pour ajouter des fichiers à un modèle existant, sélectionnez-le puis "
+                    + "utilisez « Ajouter des fichiers ».", "OK");
+                return;
+            }
+
+            if (dossiers.Count > 1)
+                LogDebug($"📦 {dossiers.Count} dossiers déposés, téléversement à la suite.");
+
+            foreach (var dossier in dossiers)
+                await TeleverserDossierAsync(dossier);
+#endif
+        }
+
+        /// <summary>
+        /// Retour visuel pendant le survol : bordure pleine et plus claire.
+        /// </summary>
+        private void SurlignerZoneDepot(bool actif)
+        {
+            ZoneDepotDossier.Stroke = actif ? Color.FromArgb("#4DB6AC") : Color.FromArgb("#00695C");
+            ZoneDepotDossier.BackgroundColor = actif ? Color.FromArgb("#1F3D3A") : Color.FromArgb("#1A2B29");
+            ZoneDepotLabel.Text = actif ? "📥  Relâchez pour téléverser" : "📂  … ou glissez un dossier ici";
+        }
+
         /// <summary>
         /// Crée (ou retrouve) le modèle correspondant au dossier choisi, puis y copie
         /// l'intégralité de son contenu en conservant l'arborescence des sous-dossiers.
         /// </summary>
         private async Task TeleverserDossierAsync(string cheminSource)
+        {
+            if (_televersementEnCours) return;
+            _televersementEnCours = true;
+            try
+            {
+                await TeleverserDossierInterneAsync(cheminSource);
+            }
+            finally
+            {
+                _televersementEnCours = false;
+            }
+        }
+
+        private async Task TeleverserDossierInterneAsync(string cheminSource)
         {
             if (_httpClient == null) return;
 

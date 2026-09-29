@@ -27,7 +27,8 @@
 param(
     [string]$Version,
     [string]$Notes = "",
-    [switch]$SansInstallation
+    [switch]$SansInstallation,
+    [switch]$SansCommit
 )
 
 . "$PSScriptRoot\_commun.ps1"
@@ -78,6 +79,11 @@ Update-Manifeste -Plateforme "serveur" `
                  -Notes $Notes
 
 Remove-AnciensPaquets -Dossier $DossierServeur -Filtre "stlexplorer-server-*.tar" -AGarder 1
+
+if (-not $SansCommit) {
+    $titre = if ($Notes) { "Deploiement serveur $Version : $Notes" } else { "Deploiement serveur $Version" }
+    Invoke-CommitEtPush -Titre $titre
+}
 
 if ($SansInstallation) {
     Write-Etape "Termine (installation non declenchee)"

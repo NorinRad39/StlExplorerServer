@@ -33,7 +33,8 @@ param(
     [ValidateSet("patch", "minor", "major")] [string]$Increment = "patch",
     [switch]$SansIncrement,
     [int]$Build = 0,
-    [string]$Notes = ""
+    [string]$Notes = "",
+    [switch]$SansCommit
 )
 
 . "$PSScriptRoot\_commun.ps1"
@@ -104,3 +105,8 @@ Remove-AnciensPaquets -Dossier $DossierWindows -Filtre "STLExplorerSetup-*.exe"
 
 Write-Etape "Termine"
 Write-Host "Les installations Windows proposeront la version $($infos.Version) a leur prochain demarrage."
+
+if (-not $SansCommit) {
+    $titre = if ($Notes) { "Deploiement Windows $($infos.Version)" + " : $Notes" } else { "Deploiement Windows $($infos.Version)" }
+    Invoke-CommitEtPush -Titre $titre
+}

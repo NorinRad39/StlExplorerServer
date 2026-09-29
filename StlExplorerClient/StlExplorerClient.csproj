@@ -27,8 +27,8 @@
 
 		<!-- Versions : source de vérité pour les scripts de deploy\ et la mise à jour auto.
 		     ApplicationVersion (versionCode Android) DOIT augmenter à chaque publication. -->
-		<ApplicationDisplayVersion>1.1.11</ApplicationDisplayVersion>
-		<ApplicationVersion>13</ApplicationVersion>
+		<ApplicationDisplayVersion>1.1.12</ApplicationDisplayVersion>
+		<ApplicationVersion>14</ApplicationVersion>
 
 		<!-- Sur Windows en mode non empaquete, AppInfo.VersionString lit l'AssemblyVersion
 		     de l'assembly d'entree. MAUI ne la derive pas d'ApplicationDisplayVersion : elle

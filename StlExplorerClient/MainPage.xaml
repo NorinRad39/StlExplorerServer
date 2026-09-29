@@ -53,8 +53,8 @@
         </Border>
 
         <!-- Contenu principal -->
-        <ScrollView Grid.Row="1">
-            <VerticalStackLayout Spacing="20">
+        <ScrollView x:Name="ScrollPrincipal" Grid.Row="1">
+            <VerticalStackLayout x:Name="ContenuPrincipal" Spacing="{OnIdiom Phone=12, Default=20}">
                 <!-- Marges resserrées sur téléphone : 30 px de chaque côté amputaient
                      un écran de ~360 dp d'un sixième de sa largeur utile. -->
                 <VerticalStackLayout.Padding>
@@ -334,9 +334,12 @@
                 </Border>
 
                 <!-- Zone de prévisualisation (image ou viewer 3D).
-                     450 dp sur un téléphone d'environ 780 dp de haut, c'était plus de la
-                     moitié de l'écran avant même le formulaire : réduite à 320 dp. -->
-                <Border Stroke="#555"
+                     Hauteur calculée dans le code (AjusterHauteurApercu) : elle prend tout
+                     l'espace laissé libre par les autres éléments, pour que la page tienne
+                     à l'écran sans défilement. La valeur ci-dessous ne sert qu'au premier
+                     affichage, avant le calcul. -->
+                <Border x:Name="ApercuBorder"
+                        Stroke="#555"
                         StrokeThickness="1"
                         HeightRequest="{OnIdiom Phone=320, Default=450}"
                         HorizontalOptions="Fill" 

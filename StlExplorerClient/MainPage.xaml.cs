@@ -64,7 +64,83 @@ namespace StlExplorerClient
             // stlviewerlog://... interceptée ici, plutôt qu'un écran vide sans indice.
             Viewer3DWebView.Navigating += OnViewer3DNavigating;
 
+            BrancherAjustementApercu();
+
             Loaded += OnPageLoaded;
+        }
+
+        // Hauteur minimale de l'aperçu : en dessous, une image ou une pièce 3D n'est plus
+        // lisible. Si l'écran ne permet même pas ce minimum, la page défile.
+        private static double HauteurMinApercu => DeviceInfo.Idiom == DeviceIdiom.Phone ? 200 : 250;
+
+        private bool _ajustementApercuPlanifie;
+
+        /// <summary>
+        /// Recalcule la hauteur de l'aperçu dès que la place disponible change : fenêtre
+        /// redimensionnée, journal de debug déplié, ou élément de la page qui apparaît,
+        /// disparaît ou change de taille (listes du modèle, barre de progression...).
+        /// </summary>
+        private void BrancherAjustementApercu()
+        {
+            ScrollPrincipal.SizeChanged += (_, _) => PlanifierAjustementApercu();
+
+            foreach (var enfant in ContenuPrincipal.Children.OfType<View>())
+            {
+                if (enfant == ApercuBorder) continue;
+                enfant.SizeChanged += (_, _) => PlanifierAjustementApercu();
+                enfant.PropertyChanged += (_, e) =>
+                {
+                    if (e.PropertyName == nameof(IsVisible)) PlanifierAjustementApercu();
+                };
+            }
+        }
+
+        /// <summary>
+        /// Regroupe les demandes : une rafale de changements (plusieurs panneaux affichés
+        /// d'un coup) ne donne lieu qu'à un seul calcul, une fois la mise en page faite.
+        /// </summary>
+        private void PlanifierAjustementApercu()
+        {
+            if (_ajustementApercuPlanifie) return;
+            _ajustementApercuPlanifie = true;
+            Dispatcher.Dispatch(() =>
+            {
+                _ajustementApercuPlanifie = false;
+                AjusterHauteurApercu();
+            });
+        }
+
+        /// <summary>
+        /// Donne à l'aperçu toute la hauteur que les autres éléments visibles laissent libre
+        /// dans la zone défilante, pour que la page tienne à l'écran sans défilement.
+        /// </summary>
+        private void AjusterHauteurApercu()
+        {
+            var disponible = ScrollPrincipal.Height;
+            if (disponible <= 0) return;
+
+            var visibles = ContenuPrincipal.Children.OfType<View>()
+                                           .Where(v => v.IsVisible)
+                                           .ToList();
+
+            // Un élément qui vient d'apparaître n'a pas encore été mesuré : on attend
+            // son SizeChanged, qui relancera le calcul avec sa vraie hauteur.
+            if (visibles.Any(v => v != ApercuBorder && v.Height < 0)) return;
+
+            double occupe = ContenuPrincipal.Padding.VerticalThickness
+                            + ContenuPrincipal.Spacing * Math.Max(0, visibles.Count - 1)
+                            + ApercuBorder.Margin.VerticalThickness;
+            foreach (var v in visibles)
+            {
+                if (v == ApercuBorder) continue;
+                occupe += v.Height + v.Margin.VerticalThickness;
+            }
+
+            // Arrondi vers le bas + 1 dp de marge : un demi-pixel de trop suffit à faire
+            // apparaître une barre de défilement.
+            var hauteur = Math.Max(HauteurMinApercu, Math.Floor(disponible - occupe) - 1);
+            if (Math.Abs(ApercuBorder.HeightRequest - hauteur) >= 1)
+                ApercuBorder.HeightRequest = hauteur;
         }
 
         /// <summary>

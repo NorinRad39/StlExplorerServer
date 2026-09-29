@@ -1354,7 +1354,7 @@ namespace StlExplorerClient
 
             if (natif.DragUIOverride != null)
             {
-                natif.DragUIOverride.Caption = $"Téléverser dans {FamilleEntry.Text?.Trim()} › {SujetEntry.Text?.Trim()}";
+                natif.DragUIOverride.Caption = $"Déplacer dans {FamilleEntry.Text?.Trim()} › {SujetEntry.Text?.Trim()}";
                 natif.DragUIOverride.IsCaptionVisible = true;
             }
 
@@ -1426,7 +1426,7 @@ namespace StlExplorerClient
         {
             ZoneDepotDossier.Stroke = actif ? Color.FromArgb("#4DB6AC") : Color.FromArgb("#00695C");
             ZoneDepotDossier.BackgroundColor = actif ? Color.FromArgb("#1F3D3A") : Color.FromArgb("#1A2B29");
-            ZoneDepotLabel.Text = actif ? "📥  Relâchez pour téléverser" : "📂  … ou glissez un dossier ici";
+            ZoneDepotLabel.Text = actif ? "📥  Relâchez pour déplacer" : "📂  … ou glissez un dossier ici pour le déplacer";
         }
 
         /// <summary>
@@ -1501,13 +1501,22 @@ namespace StlExplorerClient
                 && string.Equals(m.NomFamille, famille, StringComparison.OrdinalIgnoreCase));
 
             var tailleMo = tailleTotale / (1024.0 * 1024.0);
-            var question = existant == null
-                ? $"Copier « {nomModele} »\n({fichiers.Count} fichier(s), {tailleMo:F1} Mo)\n\nvers {famille} > {sujet} ?"
-                : $"Le modèle « {nomModele} » existe déjà dans {famille} > {sujet}.\n\n"
-                  + $"Fusionner le contenu ({fichiers.Count} fichier(s), {tailleMo:F1} Mo) ?\n"
-                  + "Les fichiers portant le même nom seront remplacés.";
 
-            if (!await DisplayAlert("Téléverser un dossier", question, "Copier", "Annuler"))
+            // Le téléversement est un déplacement : la confirmation doit dire sans ambiguïté
+            // ce qu'il adviendra du dossier d'origine, et si c'est récupérable ou non.
+            var sortSource = EstCheminReseau(cheminSource)
+                ? "⚠ Le dossier d'origine sera SUPPRIMÉ DÉFINITIVEMENT une fois la copie vérifiée "
+                  + "(dossier réseau : pas de Corbeille)."
+                : "Le dossier d'origine sera envoyé à la Corbeille une fois la copie vérifiée.";
+
+            var question = existant == null
+                ? $"Déplacer « {nomModele} »\n({fichiers.Count} fichier(s), {tailleMo:F1} Mo)\n\n"
+                  + $"vers {famille} > {sujet} ?\n\n{sortSource}"
+                : $"Le modèle « {nomModele} » existe déjà dans {famille} > {sujet}.\n\n"
+                  + $"Y déplacer le contenu ({fichiers.Count} fichier(s), {tailleMo:F1} Mo) ?\n"
+                  + $"Les fichiers portant le même nom seront remplacés.\n\n{sortSource}";
+
+            if (!await DisplayAlert("Déplacer un dossier", question, "Déplacer", "Annuler"))
                 return;
 
             try
@@ -1555,19 +1564,24 @@ namespace StlExplorerClient
                 }
 
                 // 2. Copier tout le contenu du dossier
-                await CopierFichiersVersModeleAsync(modeleId, cheminDistant, fichiers);
+                var copie = await CopierFichiersVersModeleAsync(modeleId, cheminDistant, fichiers);
 
-                // 3. Rafraîchir les listes et sélectionner le modèle importé
+                // 3. Déplacement : supprimer la source, uniquement si la copie est vérifiée.
+                //    Une exception plus haut (copie interrompue) saute cette étape : la
+                //    source n'est jamais touchée tant que tout n'est pas arrivé.
+                var bilanSource = await FinaliserDeplacementAsync(cheminSource, fichiers, copie);
+
+                // 4. Rafraîchir les listes et sélectionner le modèle importé
                 await RafraichirModelesAsync();
                 _majProgrammatique = true;
                 ModeleEntry.Text = nomModele;
                 _majProgrammatique = false;
                 RafraichirEtatInterface();
 
-                LogDebug($"✅ Dossier « {nomModele} » copié ({fichiers.Count} fichier(s), {tailleMo:F1} Mo).");
+                LogDebug($"✅ Dossier « {nomModele} » déplacé ({fichiers.Count} fichier(s), {tailleMo:F1} Mo).");
                 await DisplayAlert("Succès",
-                    $"« {nomModele} » a été copié dans {famille} > {sujet}.\n"
-                    + $"{fichiers.Count} fichier(s), {tailleMo:F1} Mo.",
+                    $"« {nomModele} » a été déplacé dans {famille} > {sujet}.\n"
+                    + $"{fichiers.Count} fichier(s), {tailleMo:F1} Mo.\n\n{bilanSource}",
                     "OK");
             }
             catch (Exception ex)
@@ -1587,7 +1601,15 @@ namespace StlExplorerClient
         /// 1. copie réseau directe vers le partage du NAS (rapide, sans limite de taille) ;
         /// 2. sinon envoi HTTP par lots via l'API (fonctionne depuis n'importe quel poste).
         /// </summary>
-        private async Task CopierFichiersVersModeleAsync(
+        /// <summary>
+        /// Voie empruntée par une copie : conditionne la manière de la vérifier avant de
+        /// supprimer la source lors d'un déplacement.
+        /// </summary>
+        /// <param name="ParReseauDirect">Vrai si les fichiers ont été écrits directement sur le partage du NAS.</param>
+        /// <param name="Destination">Dossier de destination vu depuis ce poste (copie directe uniquement).</param>
+        private sealed record ResultatCopie(bool ParReseauDirect, string? Destination);
+
+        private async Task<ResultatCopie> CopierFichiersVersModeleAsync(
             int modeleId, string? cheminDistant, List<FichierACopier> fichiers)
         {
             long tailleTotale = 0;
@@ -1636,7 +1658,213 @@ namespace StlExplorerClient
             {
                 LogDebug($"⚠ Réindexation impossible : {ex.Message}");
             }
+
+            return new ResultatCopie(copieFaite, copieFaite ? destinationReseau : null);
         }
+
+        // ============================================
+        // Déplacement : suppression de la source après copie vérifiée
+        // ============================================
+
+        /// <summary>
+        /// Indique si un chemin désigne un emplacement réseau (UNC ou lecteur réseau mappé).
+        /// Un dossier réseau n'a pas de Corbeille : sa suppression est définitive.
+        /// </summary>
+        private static bool EstCheminReseau(string chemin)
+        {
+            if (chemin.StartsWith(@"\\", StringComparison.Ordinal)) return true;
+            try
+            {
+                var racine = System.IO.Path.GetPathRoot(chemin);
+                return !string.IsNullOrEmpty(racine)
+                       && new System.IO.DriveInfo(racine).DriveType == System.IO.DriveType.Network;
+            }
+            catch
+            {
+                return true;   // doute : on traite comme réseau, donc sans suppression silencieuse
+            }
+        }
+
+        /// <summary>
+        /// Refuse de supprimer une racine de lecteur ou un dossier personnel de Windows
+        /// (Bureau, Documents, Téléchargements...) : glisser par erreur le Bureau entier
+        /// ne doit jamais le vider.
+        /// </summary>
+        private static string? RaisonDossierProtege(string chemin)
+        {
+            var normalise = System.IO.Path.GetFullPath(chemin).TrimEnd('\\', '/');
+
+            var racine = System.IO.Path.GetPathRoot(normalise)?.TrimEnd('\\', '/');
+            if (string.Equals(normalise, racine, StringComparison.OrdinalIgnoreCase))
+                return "c'est la racine d'un lecteur";
+
+            var profil = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var proteges = new[]
+            {
+                profil,
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
+                Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
+                Environment.GetFolderPath(Environment.SpecialFolder.MyPictures),
+                Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+                Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+                System.IO.Path.Combine(profil, "Downloads"),
+                System.IO.Path.Combine(profil, "OneDrive"),
+            };
+
+            return proteges
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Any(p => string.Equals(p.TrimEnd('\\', '/'), normalise, StringComparison.OrdinalIgnoreCase))
+                ? "c'est un dossier personnel de Windows"
+                : null;
+        }
+
+        /// <summary>
+        /// Vérifie que la copie est complète puis supprime le dossier d'origine.
+        /// Renvoie le message à afficher à l'utilisateur, qu'il y ait suppression ou non.
+        /// </summary>
+        /// <remarks>
+        /// Aucune suppression sans preuve que tout est arrivé à destination :
+        /// <list type="bullet">
+        /// <item>copie directe : chaque fichier est relu sur le NAS et sa taille comparée ;</item>
+        /// <item>copie directe : un fichier témoin écrit dans la destination ne doit pas être
+        /// visible depuis la source — sinon source et destination sont le même dossier
+        /// (sous deux noms différents, ex. P:\ et \\ds923\Maquette) et supprimer la source
+        /// effacerait le modèle qu'on vient de créer ;</item>
+        /// <item>envoi par l'API : chaque lot a été confirmé par le serveur, mais la
+        /// destination n'étant pas accessible pour vérification, une source réseau est
+        /// conservée par prudence.</item>
+        /// </list>
+        /// Sur un disque local, la source part à la Corbeille (récupérable). Sur un dossier
+        /// réseau, sans Corbeille, la suppression est définitive — l'utilisateur en a été
+        /// averti dans la confirmation.
+        /// </remarks>
+        private async Task<string> FinaliserDeplacementAsync(
+            string cheminSource, List<FichierACopier> fichiers, ResultatCopie copie)
+        {
+            string Conserve(string raison)
+            {
+                LogDebug($"🛑 Dossier d'origine conservé : {raison}");
+                return $"Le dossier d'origine a été conservé : {raison}.";
+            }
+
+            var protege = RaisonDossierProtege(cheminSource);
+            if (protege != null) return Conserve(protege);
+
+            var sourceReseau = EstCheminReseau(cheminSource);
+
+            if (copie.ParReseauDirect && !string.IsNullOrWhiteSpace(copie.Destination))
+            {
+                AfficherProgressionCopie(1, "Vérification de la copie...");
+
+                var destination = copie.Destination;
+                var ecart = await Task.Run(() =>
+                {
+                    foreach (var f in fichiers)
+                    {
+                        var cible = System.IO.Path.Combine(destination, f.Relatif.Replace('/', '\\'));
+                        var infoCible = new System.IO.FileInfo(cible);
+                        if (!infoCible.Exists)
+                            return $"{f.Relatif} est absent de la destination";
+                        if (infoCible.Length != new System.IO.FileInfo(f.Complet).Length)
+                            return $"{f.Relatif} n'a pas la même taille à destination";
+                    }
+                    return null;
+                });
+                if (ecart != null) return Conserve(ecart);
+
+                var memeDossier = await Task.Run(() =>
+                {
+                    var temoin = ".stlexplorer-verif-" + Guid.NewGuid().ToString("N");
+                    var cheminTemoin = System.IO.Path.Combine(destination, temoin);
+                    System.IO.File.WriteAllText(cheminTemoin, "");
+                    try
+                    {
+                        return System.IO.Directory
+                            .EnumerateFiles(cheminSource, temoin, System.IO.SearchOption.AllDirectories)
+                            .Any();
+                    }
+                    finally
+                    {
+                        try { System.IO.File.Delete(cheminTemoin); } catch { /* sans conséquence */ }
+                    }
+                });
+                if (memeDossier)
+                    return Conserve("la source et la destination sont le même dossier");
+            }
+            else if (sourceReseau)
+            {
+                return Conserve("copie passée par l'API, destination non vérifiable depuis ce poste");
+            }
+
+            AfficherProgressionCopie(1, "Suppression du dossier d'origine...");
+            try
+            {
+                if (sourceReseau)
+                {
+                    await Task.Run(() => System.IO.Directory.Delete(cheminSource, recursive: true));
+                    LogDebug($"🗑 Dossier d'origine supprimé : {cheminSource}");
+                    return "Le dossier d'origine a été supprimé (dossier réseau, sans Corbeille).";
+                }
+
+#if WINDOWS
+                var envoye = await Task.Run(() => EnvoyerALaCorbeille(cheminSource));
+                if (!envoye || System.IO.Directory.Exists(cheminSource))
+                    return Conserve("l'envoi à la Corbeille a échoué");
+
+                LogDebug($"🗑 Dossier d'origine envoyé à la Corbeille : {cheminSource}");
+                return "Le dossier d'origine a été envoyé à la Corbeille.";
+#else
+                return Conserve("suppression disponible uniquement sous Windows");
+#endif
+            }
+            catch (Exception ex)
+            {
+                return Conserve($"suppression impossible ({ex.Message})");
+            }
+        }
+
+#if WINDOWS
+        [System.Runtime.InteropServices.StructLayout(
+            System.Runtime.InteropServices.LayoutKind.Sequential,
+            CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private struct OperationFichierShell
+        {
+            public IntPtr hwnd;
+            public uint wFunc;
+            public string pFrom;
+            public string? pTo;
+            public ushort fFlags;
+            [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+            public bool fAnyOperationsAborted;
+            public IntPtr hNameMappings;
+            public string? lpszProgressTitle;
+        }
+
+        [System.Runtime.InteropServices.DllImport("shell32.dll",
+            CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+        private static extern int SHFileOperation(ref OperationFichierShell operation);
+
+        /// <summary>
+        /// Envoie un dossier à la Corbeille de Windows (récupérable), sans boîte de dialogue.
+        /// </summary>
+        private static bool EnvoyerALaCorbeille(string chemin)
+        {
+            const uint FO_DELETE = 0x0003;
+            const ushort FOF_SILENT = 0x0004, FOF_NOCONFIRMATION = 0x0010,
+                         FOF_ALLOWUNDO = 0x0040, FOF_NOERRORUI = 0x0400;
+
+            var operation = new OperationFichierShell
+            {
+                wFunc = FO_DELETE,
+                // L'API attend une liste de chemins terminée par un double caractère nul.
+                pFrom = System.IO.Path.GetFullPath(chemin).TrimEnd('\\') + "\0\0",
+                fFlags = FOF_ALLOWUNDO | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_SILENT,
+            };
+
+            return SHFileOperation(ref operation) == 0 && !operation.fAnyOperationsAborted;
+        }
+#endif
 
         /// <summary>
         /// Copie les fichiers directement sur le partage réseau du NAS, en recréant les

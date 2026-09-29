@@ -268,7 +268,7 @@
                     <!-- InputTransparent : le dépôt doit atterrir sur la bordure, pas sur le texte -->
                     <Label x:Name="ZoneDepotLabel"
                            InputTransparent="True"
-                           Text="📂  … ou glissez un dossier ici"
+                           Text="📂  … ou glissez un dossier ici pour le déplacer"
                            TextColor="#80CBC4"
                            FontSize="13"
                            HorizontalTextAlignment="Center" />

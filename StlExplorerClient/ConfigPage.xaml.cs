@@ -52,7 +52,7 @@ namespace StlExplorerClient
             try
             {
                 BtnVerifierMaj.IsEnabled = false;
-                StatusLabel.TextColor = Color.FromArgb("#E0E0E0");
+                StatusLabel.TextColor = (Color)Application.Current!.Resources["Craie"];
                 StatusLabel.Text = "Vérification des mises à jour...";
 
                 var progression = new Progress<double>(p =>
@@ -74,7 +74,7 @@ namespace StlExplorerClient
             var url = ServerUrlEntry.Text?.Trim();
             if (string.IsNullOrWhiteSpace(url))
             {
-                UrlStatusLabel.TextColor = Colors.Red;
+                UrlStatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                 UrlStatusLabel.Text = "L'URL ne peut pas être vide.";
                 return;
             }
@@ -84,7 +84,7 @@ namespace StlExplorerClient
 
             if (!Uri.TryCreate(url, UriKind.Absolute, out var adresse))
             {
-                UrlStatusLabel.TextColor = Colors.Red;
+                UrlStatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                 UrlStatusLabel.Text = "URL invalide. Utilisez le format http://ip:port";
                 return;
             }
@@ -100,14 +100,14 @@ namespace StlExplorerClient
 
                 if (!continuer)
                 {
-                    UrlStatusLabel.TextColor = Color.FromArgb("#FFB74D");
+                    UrlStatusLabel.TextColor = (Color)Application.Current!.Resources["Attention"];
                     UrlStatusLabel.Text = "Enregistrement annulé.";
                     return;
                 }
             }
 
             Preferences.Set(ServerUrlKey, url);
-            UrlStatusLabel.TextColor = Color.FromArgb("#4CAF50");
+            UrlStatusLabel.TextColor = (Color)Application.Current!.Resources["Succes"];
             UrlStatusLabel.Text = $"URL enregistrée : {url}";
 
             await DisplayAlert("Redémarrage requis",
@@ -140,7 +140,7 @@ namespace StlExplorerClient
             }
             catch (Exception ex)
             {
-                StatusLabel.TextColor = Colors.Red;
+                StatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                 StatusLabel.Text = "Erreur lors de la sélection : " + ex.Message;
             }
 #endif
@@ -162,7 +162,7 @@ namespace StlExplorerClient
             }
             catch (Exception ex)
             {
-                StatusLabel.TextColor = Colors.Red;
+                StatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                 StatusLabel.Text = "Erreur de chargement : " + ex.Message;
             }
         }
@@ -209,19 +209,19 @@ namespace StlExplorerClient
 
                 if (response.IsSuccessStatusCode)
                 {
-                    StatusLabel.TextColor = Color.FromArgb("#4CAF50");
+                    StatusLabel.TextColor = (Color)Application.Current!.Resources["Succes"];
                     StatusLabel.Text = "Configuration enregistree avec succes.";
                 }
                 else
                 {
                     var erreur = await response.Content.ReadAsStringAsync();
-                    StatusLabel.TextColor = Colors.Red;
+                    StatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                     StatusLabel.Text = "Erreur serveur : " + erreur;
                 }
             }
             catch (Exception ex)
             {
-                StatusLabel.TextColor = Colors.Red;
+                StatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                 StatusLabel.Text = "Erreur : " + ex.Message;
             }
             finally
@@ -237,31 +237,31 @@ namespace StlExplorerClient
             try
             {
                 BtnRelancerScan.IsEnabled = false;
-                StatusLabel.TextColor = Color.FromArgb("#E0E0E0");
+                StatusLabel.TextColor = (Color)Application.Current!.Resources["Craie"];
                 StatusLabel.Text = "Synchronisation intelligente en cours...";
 
                 var response = await _httpClient.PostAsync("/api/Metadata/sync-intelligent", null);
 
                 if (response.IsSuccessStatusCode)
                 {
-                    StatusLabel.TextColor = Color.FromArgb("#4CAF50");
+                    StatusLabel.TextColor = (Color)Application.Current!.Resources["Succes"];
                     StatusLabel.Text = "Synchronisation intelligente lancée en tâche de fond.";
                 }
                else if (response.StatusCode == System.Net.HttpStatusCode.Conflict)
                {
-                   StatusLabel.TextColor = Color.FromArgb("#FFB74D");
+                   StatusLabel.TextColor = (Color)Application.Current!.Resources["Attention"];
                    StatusLabel.Text = "ℹ Un scan est déjà en cours. Patientez...";
                }
                 else
                 {
                     var erreur = await response.Content.ReadAsStringAsync();
-                    StatusLabel.TextColor = Colors.Red;
+                    StatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                     StatusLabel.Text = "Erreur : " + erreur;
                 }
             }
             catch (Exception ex)
             {
-                StatusLabel.TextColor = Colors.Red;
+                StatusLabel.TextColor = (Color)Application.Current!.Resources["Erreur"];
                 StatusLabel.Text = "Erreur : " + ex.Message;
             }
             finally

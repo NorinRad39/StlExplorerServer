@@ -58,90 +58,70 @@ namespace StlExplorerClient
 
             // Le panel d'actions (création de dossier, ajout de fichiers) n'est visible que sur Windows
             if (DeviceInfo.Platform == DevicePlatform.WinUI)
+            {
                 WindowsActionsPanel.IsVisible = true;
+                BtnMenuActions.IsVisible = true;
+            }
 
             // Le viewer 3D (Three.js) signale ses erreurs via une fausse navigation
             // stlviewerlog://... interceptée ici, plutôt qu'un écran vide sans indice.
             Viewer3DWebView.Navigating += OnViewer3DNavigating;
 
-            BrancherAjustementApercu();
+            Corps.SizeChanged += (_, _) => AdapterDisposition();
+            FamilleEntry.TextChanged += (_, _) => MettreAJourFilAriane();
+            SujetEntry.TextChanged += (_, _) => MettreAJourFilAriane();
+            ModeleEntry.TextChanged += (_, _) => MettreAJourFilAriane();
 
             Loaded += OnPageLoaded;
         }
 
-        // Hauteur minimale de l'aperçu : en dessous, une image ou une pièce 3D n'est plus
-        // lisible. Si l'écran ne permet même pas ce minimum, la page défile.
-        private static double HauteurMinApercu => DeviceInfo.Idiom == DeviceIdiom.Phone ? 200 : 250;
-
-        private bool _ajustementApercuPlanifie;
+        // Largeur à partir de laquelle la navigation et le plateau se placent côte à côte.
+        private const double LargeurDeuxColonnes = 760;
+        private const double LargeurColonneNav = 340;
 
         /// <summary>
-        /// Recalcule la hauteur de l'aperçu dès que la place disponible change : fenêtre
-        /// redimensionnée, journal de debug déplié, ou élément de la page qui apparaît,
-        /// disparaît ou change de taille (listes du modèle, barre de progression...).
+        /// Deux colonnes (navigation | plateau) quand la fenêtre est assez large ; sinon une
+        /// seule colonne, le plateau au-dessus de la navigation.
         /// </summary>
-        private void BrancherAjustementApercu()
+        private void AdapterDisposition()
         {
-            ScrollPrincipal.SizeChanged += (_, _) => PlanifierAjustementApercu();
+            if (Corps.Width <= 0 || Corps.Height <= 0) return;
 
-            foreach (var enfant in ContenuPrincipal.Children.OfType<View>())
+            if (Corps.Width >= LargeurDeuxColonnes)
             {
-                if (enfant == ApercuBorder) continue;
-                enfant.SizeChanged += (_, _) => PlanifierAjustementApercu();
-                enfant.PropertyChanged += (_, e) =>
-                {
-                    if (e.PropertyName == nameof(IsVisible)) PlanifierAjustementApercu();
-                };
+                ColonneA.Width = new GridLength(LargeurColonneNav);
+                ColonneB.Width = GridLength.Star;
+                LigneA.Height = GridLength.Star;
+                LigneB.Height = new GridLength(0);
+                Grid.SetRow(NavColonne, 0); Grid.SetColumn(NavColonne, 0);
+                Grid.SetRow(SceneColonne, 0); Grid.SetColumn(SceneColonne, 1);
+            }
+            else
+            {
+                // Le plateau prend environ 45 % de la hauteur, la navigation défile dessous.
+                ColonneA.Width = GridLength.Star;
+                ColonneB.Width = new GridLength(0);
+                LigneA.Height = new GridLength(Math.Clamp(Corps.Height * 0.45, 240, 420));
+                LigneB.Height = GridLength.Star;
+                Grid.SetRow(SceneColonne, 0); Grid.SetColumn(SceneColonne, 0);
+                Grid.SetRow(NavColonne, 1); Grid.SetColumn(NavColonne, 0);
             }
         }
 
         /// <summary>
-        /// Regroupe les demandes : une rafale de changements (plusieurs panneaux affichés
-        /// d'un coup) ne donne lieu qu'à un seul calcul, une fois la mise en page faite.
+        /// Affiche « Famille / Sujet / Modèle » dans l'en-tête, selon ce qui est renseigné.
         /// </summary>
-        private void PlanifierAjustementApercu()
+        private void MettreAJourFilAriane()
         {
-            if (_ajustementApercuPlanifie) return;
-            _ajustementApercuPlanifie = true;
-            Dispatcher.Dispatch(() =>
-            {
-                _ajustementApercuPlanifie = false;
-                AjusterHauteurApercu();
-            });
+            var parties = new[] { FamilleEntry.Text, SujetEntry.Text, ModeleEntry.Text }
+                .Select(t => t?.Trim())
+                .Where(t => !string.IsNullOrEmpty(t));
+            var fil = string.Join("  /  ", parties);
+            FilArianeLabel.Text = fil.Length > 0 ? fil : "Catalogue";
         }
 
-        /// <summary>
-        /// Donne à l'aperçu toute la hauteur que les autres éléments visibles laissent libre
-        /// dans la zone défilante, pour que la page tienne à l'écran sans défilement.
-        /// </summary>
-        private void AjusterHauteurApercu()
-        {
-            var disponible = ScrollPrincipal.Height;
-            if (disponible <= 0) return;
-
-            var visibles = ContenuPrincipal.Children.OfType<View>()
-                                           .Where(v => v.IsVisible)
-                                           .ToList();
-
-            // Un élément qui vient d'apparaître n'a pas encore été mesuré : on attend
-            // son SizeChanged, qui relancera le calcul avec sa vraie hauteur.
-            if (visibles.Any(v => v != ApercuBorder && v.Height < 0)) return;
-
-            double occupe = ContenuPrincipal.Padding.VerticalThickness
-                            + ContenuPrincipal.Spacing * Math.Max(0, visibles.Count - 1)
-                            + ApercuBorder.Margin.VerticalThickness;
-            foreach (var v in visibles)
-            {
-                if (v == ApercuBorder) continue;
-                occupe += v.Height + v.Margin.VerticalThickness;
-            }
-
-            // Arrondi vers le bas + 1 dp de marge : un demi-pixel de trop suffit à faire
-            // apparaître une barre de défilement.
-            var hauteur = Math.Max(HauteurMinApercu, Math.Floor(disponible - occupe) - 1);
-            if (Math.Abs(ApercuBorder.HeightRequest - hauteur) >= 1)
-                ApercuBorder.HeightRequest = hauteur;
-        }
+        private void OnMenuActionsClicked(object? sender, EventArgs e)
+            => ActionsMenuPanel.IsVisible = !ActionsMenuPanel.IsVisible;
 
         /// <summary>
         /// Intercepte les messages de diagnostic envoyés par viewer3d.html (voir reportLog() côté JS)
@@ -896,9 +876,6 @@ namespace StlExplorerClient
                                           && !string.IsNullOrWhiteSpace(sujet)
                                           && string.IsNullOrWhiteSpace(modele);
 
-            // La zone de glisser-déposer suit exactement le bouton : même action, même condition.
-            ZoneDepotDossier.IsVisible = BtnTeleverserDossier.IsVisible;
-
             if (champsPleins)
             {
                 // Vérifier si cette combinaison exacte existe dans les données chargées
@@ -1418,7 +1395,9 @@ namespace StlExplorerClient
         {
 #if WINDOWS
             var natif = e.PlatformArgs?.DragEventArgs;
-            if (natif == null || _televersementEnCours
+            // Le dépôt suit la condition du bouton « Téléverser un dossier » : Famille et Sujet
+            // renseignés, Modèle vide.
+            if (natif == null || _televersementEnCours || !BtnTeleverserDossier.IsVisible
                 || !natif.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems))
             {
                 e.AcceptedOperation = Microsoft.Maui.Controls.DataPackageOperation.None;
@@ -1449,7 +1428,7 @@ namespace StlExplorerClient
             SurlignerZoneDepot(false);
 #if WINDOWS
             var natif = e.PlatformArgs?.DragEventArgs;
-            if (natif == null || _televersementEnCours) return;
+            if (natif == null || _televersementEnCours || !BtnTeleverserDossier.IsVisible) return;
             if (!natif.DataView.Contains(Windows.ApplicationModel.DataTransfer.StandardDataFormats.StorageItems)) return;
 
             e.Handled = true;
@@ -1496,13 +1475,11 @@ namespace StlExplorerClient
         }
 
         /// <summary>
-        /// Retour visuel pendant le survol : bordure pleine et plus claire.
+        /// Retour visuel : la zone de dépôt n'apparaît que pendant le survol d'un glisser-déposer.
         /// </summary>
         private void SurlignerZoneDepot(bool actif)
         {
-            ZoneDepotDossier.Stroke = actif ? Color.FromArgb("#4DB6AC") : Color.FromArgb("#00695C");
-            ZoneDepotDossier.BackgroundColor = actif ? Color.FromArgb("#1F3D3A") : Color.FromArgb("#1A2B29");
-            ZoneDepotLabel.Text = actif ? "📥  Relâchez pour déplacer" : "📂  … ou glissez un dossier ici pour le déplacer";
+            ZoneDepotDossier.IsVisible = actif;
         }
 
         /// <summary>

@@ -70,9 +70,9 @@
 		<MauiIcon Include="Resources\AppIcon\appicon.png" />
 
 		<!-- Ecran de demarrage : meme badge que l'icone, sur le fond sombre de
-		     l'application (#1E1E1E, celui de la page Catalogue). Le violet .NET
+		     l'application (#1B1D1C, celui de la page Catalogue). Le violet .NET
 		     d'origine provoquait un flash clair avant l'ouverture de l'interface. -->
-		<MauiSplashScreen Include="Resources\Splash\splash.png" Color="#1E1E1E" BaseSize="256,256" />
+		<MauiSplashScreen Include="Resources\Splash\splash.png" Color="#1B1D1C" BaseSize="256,256" />
 
 		<!-- Images -->
 		<MauiImage Include="Resources\Images\*" />

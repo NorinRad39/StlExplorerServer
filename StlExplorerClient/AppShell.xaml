@@ -5,9 +5,9 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
     xmlns:local="clr-namespace:StlExplorerClient"
     Title="STL Explorer"
-    Shell.BackgroundColor="#2D2D2D"
-    Shell.ForegroundColor="#E0E0E0"
-    Shell.TitleColor="#E0E0E0">
+    Shell.BackgroundColor="{StaticResource Etabli}"
+    Shell.ForegroundColor="{StaticResource Craie}"
+    Shell.TitleColor="{StaticResource Craie}">
 
     <ShellContent
         Title="Catalogue"

@@ -12,8 +12,9 @@ namespace StlExplorerClient
                 .UseMauiApp<App>()
                 .ConfigureFonts(fonts =>
                 {
-                    fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular");
-                    fonts.AddFont("OpenSans-Semibold.ttf", "OpenSansSemibold");
+                    fonts.AddFont("AtkinsonHyperlegibleNext-Regular.ttf", "TexteRegular");
+                    fonts.AddFont("AtkinsonHyperlegibleNext-Bold.ttf", "TexteBold");
+                    fonts.AddFont("BricolageGrotesque-Bold.ttf", "TitreBold");
                 });
 
 #if WINDOWS

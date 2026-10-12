@@ -7,13 +7,13 @@
 /* touch-action / overscroll : sur mobile, le glissement doit faire tourner le
    modele et non defiler la page qui contient la WebView. */
 html, body {
-  margin: 0; height: 100%; overflow: hidden; background: #2D2D2D;
+  margin: 0; height: 100%; overflow: hidden; background: #161817;
   touch-action: none;
   overscroll-behavior: none;
 }
 canvas { display: block; touch-action: none; }
 #info { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-        color: #666; font-family: sans-serif; font-size: 12px; pointer-events: none;
+        color: #9AA39D; font-family: sans-serif; font-size: 12px; pointer-events: none;
         text-align: center; max-width: 95%; }
 </style>
 </head>
@@ -41,7 +41,7 @@ canvas { display: block; touch-action: none; }
     var info = document.getElementById('info');
     if (info) {
       info.textContent = message;
-      info.style.color = fatal ? '#ff6b6b' : '#666';
+      info.style.color = fatal ? '#E0705C' : '#9AA39D';
     }
   }
 
@@ -85,7 +85,7 @@ import { STLLoader } from './vendor/three/addons/loaders/STLLoader.js';
 import { OBJLoader } from './vendor/three/addons/loaders/OBJLoader.js';
 
 const scene = new THREE.Scene();
-scene.background = new THREE.Color(0x2D2D2D);
+scene.background = new THREE.Color(0x161817);
 
 const camera = new THREE.PerspectiveCamera(60, 1, 0.01, 100000);
 
@@ -159,7 +159,7 @@ function centerAndFit(obj) {
   controls.update();
 }
 
-const mat = new THREE.MeshStandardMaterial({ color: 0x00aaff, metalness: 0.25, roughness: 0.65 });
+const mat = new THREE.MeshStandardMaterial({ color: 0x6FB7D6, metalness: 0.25, roughness: 0.65 });
 const AIDE = 'Clic gauche = rotation · Clic droit = panoramique · Molette = zoom';
 
 // ------------------------------------------------------------------

@@ -1,435 +1,408 @@
-﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:local="clr-namespace:StlExplorerClient"
              x:Class="StlExplorerClient.MainPage"
              Title="Catalogue"
-             BackgroundColor="#1E1E1E">
+             Shell.NavBarIsVisible="False">
 
-    <ContentPage.ToolbarItems>
-        <ToolbarItem Text="⚙ Config" Clicked="OnConfigClicked" />
-    </ContentPage.ToolbarItems>
+    <ContentPage.Resources>
+        <local:PlateauDrawable x:Key="PlateauDrawable" />
+    </ContentPage.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-           <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
+
+        <!-- En-tête : fil d'Ariane (famille / sujet / modèle) et boutons globaux -->
+        <Grid Grid.Row="0"
+              ColumnDefinitions="*, Auto, Auto"
+              ColumnSpacing="8"
+              Padding="16,10">
+            <Label x:Name="FilArianeLabel"
+                   Grid.Column="0"
+                   Style="{StaticResource Titre}"
+                   FontSize="18"
+                   LineBreakMode="HeadTruncation"
+                   MaxLines="1"
+                   VerticalOptions="Center"
+                   Text="Catalogue" />
+            <Button x:Name="BtnMenuActions"
+                    Grid.Column="1"
+                    Text="Actions"
+                    IsVisible="False"
+                    Clicked="OnMenuActionsClicked" />
+            <Button Grid.Column="2"
+                    Text="Config"
+                    Clicked="OnConfigClicked" />
+        </Grid>
+
+        <VerticalStackLayout Grid.Row="1">
+        <!-- Menu des actions (Windows) : replié par défaut, ouvert par le bouton « Actions » -->
+        <Border x:Name="ActionsMenuPanel"
+                IsVisible="False"
+                Margin="16,0,16,8"
+                Padding="10">
+            <FlexLayout Wrap="Wrap" JustifyContent="Start" AlignItems="Center">
+                <Button x:Name="BtnCreerDossier"
+                        Text="Créer le dossier"
+                        Margin="0,0,8,0"
+                        IsVisible="False"
+                        Clicked="OnCreerDossierClicked" />
+                <Button x:Name="BtnAjouterFichiers"
+                        Text="Ajouter des fichiers"
+                        Margin="0,0,8,0"
+                        IsVisible="False"
+                        Clicked="OnAjouterFichiersClicked" />
+                <Button x:Name="BtnRenommerModele"
+                        Text="Renommer"
+                        Margin="0,0,8,0"
+                        IsVisible="False"
+                        Clicked="OnRenommerModeleClicked" />
+                <Button x:Name="BtnOuvrirExplorateur"
+                        Text="Ouvrir le dossier"
+                        Margin="0,0,8,0"
+                        IsVisible="False"
+                        Clicked="OnOuvrirExplorateurClicked" />
+                <Button x:Name="BtnActualiserBase"
+                        Text="Actualiser la base"
+                        Clicked="OnActualiserBaseClicked" />
+            </FlexLayout>
+        </Border>
 
         <!-- Bannière de progression du scan (visible uniquement pendant un scan) -->
         <Border x:Name="ScanProgressPanel"
-                Grid.Row="0"
                 IsVisible="False"
-                BackgroundColor="#1A3A5C"
-                StrokeThickness="0"
-                Padding="15,10">
+                BackgroundColor="{StaticResource ResineFond}"
+                Margin="16,0,16,8"
+                Padding="12,8">
             <Grid ColumnDefinitions="*, Auto" ColumnSpacing="15">
-                <VerticalStackLayout Grid.Column="0" Spacing="5" VerticalOptions="Center">
+                <VerticalStackLayout Grid.Column="0" Spacing="4" VerticalOptions="Center">
                     <Grid ColumnDefinitions="*, Auto">
                         <Label x:Name="ScanPhaseLabel"
                                Grid.Column="0"
-                               Text="Scan en cours..."
-                               TextColor="#90CAF9"
-                               FontSize="13"
-                               FontAttributes="Bold" />
+                               Text="Analyse en cours"
+                               TextColor="{StaticResource Resine}"
+                               FontFamily="TexteBold"
+                               FontSize="13" />
                         <Label x:Name="ScanEtaLabel"
                                Grid.Column="1"
                                Text=""
-                               TextColor="#78909C"
+                               Style="{StaticResource Secondaire}"
                                FontSize="12"
                                VerticalOptions="Center" />
                     </Grid>
-                    <ProgressBar x:Name="ScanProgressBar"
-                                 Progress="0"
-                                 ProgressColor="#2196F3" />
+                    <ProgressBar x:Name="ScanProgressBar" Progress="0" />
                 </VerticalStackLayout>
                 <Label x:Name="ScanPercentLabel"
                        Grid.Column="1"
                        Text="0%"
-                       TextColor="White"
-                       FontSize="22"
-                       FontAttributes="Bold"
+                       Style="{StaticResource Titre}"
                        VerticalOptions="Center" />
             </Grid>
         </Border>
 
-        <!-- Contenu principal -->
-        <ScrollView x:Name="ScrollPrincipal" Grid.Row="1">
-            <VerticalStackLayout x:Name="ContenuPrincipal" Spacing="{OnIdiom Phone=12, Default=20}">
-                <!-- Marges resserrées sur téléphone : 30 px de chaque côté amputaient
-                     un écran de ~360 dp d'un sixième de sa largeur utile. -->
-                <VerticalStackLayout.Padding>
-                    <OnIdiom x:TypeArguments="Thickness" Default="30" Phone="16,20" />
-                </VerticalStackLayout.Padding>
+        </VerticalStackLayout>
+        <!-- Corps : deux colonnes (navigation | plateau) sur grand écran, une seule sur
+             téléphone ou fenêtre étroite. La disposition est recalculée dans le code
+             (AdapterDisposition). -->
+        <Grid x:Name="Corps" Grid.Row="2" ColumnSpacing="0" RowSpacing="0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ColonneA" Width="340" />
+                <ColumnDefinition x:Name="ColonneB" Width="*" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="LigneA" Height="*" />
+                <RowDefinition x:Name="LigneB" Height="0" />
+            </Grid.RowDefinitions>
 
+            <!-- ============ Navigation ============ -->
+            <Grid x:Name="NavColonne" Grid.Row="0" Grid.Column="0" RowDefinitions="*, Auto">
+                <ScrollView x:Name="ScrollPrincipal" Grid.Row="0">
+                    <VerticalStackLayout x:Name="ContenuPrincipal" Spacing="12" Padding="16,4,16,12">
 
-                <!-- Formulaire hiérarchique avec ComboBox simulées -->
-                <!-- Largeur adaptative : la colonne des champs s'étire jusqu'à 350 px sur
-                     grand écran, et se réduit pour tenir sur la largeur d'un téléphone. -->
-                <Grid RowSpacing="5" ColumnSpacing="15" HorizontalOptions="Fill" MaximumWidthRequest="445">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <Grid.ColumnDefinitions>
-                        <!-- Auto : la colonne des libellés prend la largeur du mot le plus
-                             long (« Famille ») au lieu d'un 80 px figé. -->
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                        <!-- Famille / Sujet / Modèle : champs avec liste de suggestions -->
+                        <Grid RowSpacing="4" ColumnSpacing="10" HorizontalOptions="Fill">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
 
-                    <!-- Ligne Famille -->
-                    <Label Grid.Row="0" Grid.Column="0" Text="Famille" VerticalOptions="Center" TextColor="#E0E0E0" />
-                    <Border Grid.Row="0" Grid.Column="1" Stroke="#555" StrokeThickness="1" HeightRequest="40" BackgroundColor="#383838" Padding="0">
-                        <Grid ColumnDefinitions="*, 30, 35">
-                            <Entry x:Name="FamilleEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextColor="#E0E0E0" PlaceholderColor="#888" TextChanged="OnFamilleTextChanged" BackgroundColor="Transparent" />
-                            <Button Grid.Column="1" Text="✕" FontSize="11" TextColor="#888" BackgroundColor="Transparent" Padding="0" Clicked="OnFamilleClearClicked" />
-                            <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" TextColor="#E0E0E0" BackgroundColor="Transparent" Padding="0" Clicked="OnFamilleDropdownClicked" />
+                            <Label Grid.Row="0" Grid.Column="0" Text="Famille" Style="{StaticResource Secondaire}" VerticalOptions="Center" />
+                            <Border Grid.Row="0" Grid.Column="1" Style="{StaticResource Champ}">
+                                <Grid ColumnDefinitions="*, 30, 35">
+                                    <Entry x:Name="FamilleEntry" Grid.Column="0" Placeholder="Saisir ou choisir" TextChanged="OnFamilleTextChanged" />
+                                    <Button Grid.Column="1" Text="✕" FontSize="11" Style="{StaticResource Discret}" Clicked="OnFamilleClearClicked" />
+                                    <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" Style="{StaticResource Discret}" Clicked="OnFamilleDropdownClicked" />
+                                </Grid>
+                            </Border>
+                            <Border x:Name="FamilleListContainer" Grid.Row="1" Grid.Column="1" IsVisible="False" HeightRequest="120" Padding="0">
+                                <CollectionView x:Name="FamilleCollectionView" SelectionMode="Single" SelectionChanged="OnFamilleSelectionChanged">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Label Text="{Binding .}" Padding="10,8" />
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </Border>
+
+                            <Label Grid.Row="2" Grid.Column="0" Text="Sujet" Style="{StaticResource Secondaire}" VerticalOptions="Center" />
+                            <Border Grid.Row="2" Grid.Column="1" Style="{StaticResource Champ}">
+                                <Grid ColumnDefinitions="*, 30, 35">
+                                    <Entry x:Name="SujetEntry" Grid.Column="0" Placeholder="Saisir ou choisir" TextChanged="OnSujetTextChanged" />
+                                    <Button Grid.Column="1" Text="✕" FontSize="11" Style="{StaticResource Discret}" Clicked="OnSujetClearClicked" />
+                                    <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" Style="{StaticResource Discret}" Clicked="OnSujetDropdownClicked" />
+                                </Grid>
+                            </Border>
+                            <Border x:Name="SujetListContainer" Grid.Row="3" Grid.Column="1" IsVisible="False" HeightRequest="120" Padding="0">
+                                <CollectionView x:Name="SujetCollectionView" SelectionMode="Single" SelectionChanged="OnSujetSelectionChanged">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Label Text="{Binding .}" Padding="10,8" />
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </Border>
+
+                            <Label Grid.Row="4" Grid.Column="0" Text="Modèle" Style="{StaticResource Secondaire}" VerticalOptions="Center" />
+                            <Border Grid.Row="4" Grid.Column="1" Style="{StaticResource Champ}">
+                                <Grid ColumnDefinitions="*, 30, 35">
+                                    <Entry x:Name="ModeleEntry" Grid.Column="0" Placeholder="Saisir ou choisir" TextChanged="OnModeleTextChanged" />
+                                    <Button Grid.Column="1" Text="✕" FontSize="11" Style="{StaticResource Discret}" Clicked="OnModeleClearClicked" />
+                                    <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" Style="{StaticResource Discret}" Clicked="OnModeleDropdownClicked" />
+                                </Grid>
+                            </Border>
+                            <Border x:Name="ModeleListContainer" Grid.Row="5" Grid.Column="1" IsVisible="False" HeightRequest="120" Padding="0">
+                                <CollectionView x:Name="ModeleCollectionView" SelectionMode="Single" SelectionChanged="OnModeleSelectionChanged">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Label Text="{Binding .}" Padding="10,8" />
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </Border>
                         </Grid>
-                    </Border>
-                    <Border x:Name="FamilleListContainer" Grid.Row="1" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D">
-                        <CollectionView x:Name="FamilleCollectionView" SelectionMode="Single" SelectionChanged="OnFamilleSelectionChanged">
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate>
-                                    <Label Text="{Binding .}" Padding="10,8" TextColor="#E0E0E0" />
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </Border>
 
-                    <!-- Ligne Sujet -->
-                    <Label Grid.Row="2" Grid.Column="0" Text="Sujet" VerticalOptions="Center" TextColor="#E0E0E0" />
-                    <Border Grid.Row="2" Grid.Column="1" Stroke="#555" StrokeThickness="1" HeightRequest="40" BackgroundColor="#383838" Padding="0">
-                        <Grid ColumnDefinitions="*, 30, 35">
-                            <Entry x:Name="SujetEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextColor="#E0E0E0" PlaceholderColor="#888" TextChanged="OnSujetTextChanged" BackgroundColor="Transparent" />
-                            <Button Grid.Column="1" Text="✕" FontSize="11" TextColor="#888" BackgroundColor="Transparent" Padding="0" Clicked="OnSujetClearClicked" />
-                            <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" TextColor="#E0E0E0" BackgroundColor="Transparent" Padding="0" Clicked="OnSujetDropdownClicked" />
+                        <!-- Modèle précédent / suivant dans le sujet (boutons ou flèches ◀ ▶ du clavier) -->
+                        <Grid x:Name="ModeleNavPanel"
+                              IsVisible="False"
+                              ColumnDefinitions="Auto, Auto, *"
+                              ColumnSpacing="8">
+                            <Button x:Name="BtnModelePrecedent"
+                                    Grid.Column="0"
+                                    Text="&#x25C0;"
+                                    WidthRequest="48"
+                                    ToolTipProperties.Text="Modèle précédent (flèche gauche du clavier)"
+                                    Clicked="OnModelePrecedentClicked" />
+                            <Button x:Name="BtnModeleSuivant"
+                                    Grid.Column="1"
+                                    Text="&#x25B6;"
+                                    WidthRequest="48"
+                                    ToolTipProperties.Text="Modèle suivant (flèche droite du clavier)"
+                                    Clicked="OnModeleSuivantClicked" />
+                            <Label x:Name="ModeleNavLabel"
+                                   Grid.Column="2"
+                                   Text=""
+                                   Style="{StaticResource Secondaire}"
+                                   LineBreakMode="TailTruncation"
+                                   VerticalOptions="Center" />
                         </Grid>
-                    </Border>
-                    <Border x:Name="SujetListContainer" Grid.Row="3" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D">
-                        <CollectionView x:Name="SujetCollectionView" SelectionMode="Single" SelectionChanged="OnSujetSelectionChanged">
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate>
-                                    <Label Text="{Binding .}" Padding="10,8" TextColor="#E0E0E0" />
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </Border>
 
-                    <!-- Ligne Modèle -->
-                    <Label Grid.Row="4" Grid.Column="0" Text="Modèle" VerticalOptions="Center" TextColor="#E0E0E0" />
-                    <Border Grid.Row="4" Grid.Column="1" Stroke="#555" StrokeThickness="1" HeightRequest="40" BackgroundColor="#383838" Padding="0">
-                        <Grid ColumnDefinitions="*, 30, 35">
-                            <Entry x:Name="ModeleEntry" Grid.Column="0" Placeholder="Saisir ou choisir..." TextColor="#E0E0E0" PlaceholderColor="#888" TextChanged="OnModeleTextChanged" BackgroundColor="Transparent" />
-                            <Button Grid.Column="1" Text="✕" FontSize="11" TextColor="#888" BackgroundColor="Transparent" Padding="0" Clicked="OnModeleClearClicked" />
-                            <Button Grid.Column="2" Text="&#x25BC;" FontSize="12" TextColor="#E0E0E0" BackgroundColor="Transparent" Padding="0" Clicked="OnModeleDropdownClicked" />
-                        </Grid>
-                    </Border>
-                    <Border x:Name="ModeleListContainer" Grid.Row="5" Grid.Column="1" IsVisible="False" HeightRequest="120" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D">
-                        <CollectionView x:Name="ModeleCollectionView" SelectionMode="Single" SelectionChanged="OnModeleSelectionChanged">
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate>
-                                    <Label Text="{Binding .}" Padding="10,8" TextColor="#E0E0E0" />
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </Border>
-                </Grid>
+                        <!-- Contenu du dossier (fichiers et sous-dossiers à la racine) -->
+                        <Border x:Name="ContenuDossierPanel" IsVisible="False" Padding="12,10">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Contenu du dossier" Style="{StaticResource TitreSection}" />
+                                <CollectionView x:Name="ContenuDossierCollectionView" HeightRequest="100">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate>
+                                            <!-- CharacterWrap : un nom de fichier long sans espace doit
+                                                 revenir à la ligne au lieu d'élargir la liste. -->
+                                            <Label Text="{Binding .}" Padding="0,3" Style="{StaticResource Secondaire}" LineBreakMode="CharacterWrap" />
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+                        </Border>
 
-                <!-- Défilement rapide des modèles du sujet (boutons ou flèches ◀ ▶ du clavier).
-                     Boutons compacts et libellé tronqué : sur téléphone, la largeur disponible
-                     ne permet pas des boutons texte suivis d'un nom de modèle complet. -->
-                <Grid x:Name="ModeleNavPanel"
-                      IsVisible="False"
-                      ColumnDefinitions="Auto, Auto, *"
-                      ColumnSpacing="10"
-                      HorizontalOptions="Fill"
-                      MaximumWidthRequest="445">
-                    <Button x:Name="BtnModelePrecedent"
-                            Grid.Column="0"
-                            Text="&#x25C0;"
-                            FontSize="16"
-                            WidthRequest="60"
-                            HeightRequest="40"
-                            BackgroundColor="#37474F"
-                            TextColor="White"
-                            CornerRadius="5"
-                            ToolTipProperties.Text="Modèle précédent (flèche gauche du clavier)"
-                            Clicked="OnModelePrecedentClicked" />
-                    <Button x:Name="BtnModeleSuivant"
-                            Grid.Column="1"
-                            Text="&#x25B6;"
-                            FontSize="16"
-                            WidthRequest="60"
-                            HeightRequest="40"
-                            BackgroundColor="#37474F"
-                            TextColor="White"
-                            CornerRadius="5"
-                            ToolTipProperties.Text="Modèle suivant (flèche droite du clavier)"
-                            Clicked="OnModeleSuivantClicked" />
-                    <Label x:Name="ModeleNavLabel"
-                           Grid.Column="2"
-                           Text=""
-                           TextColor="#B0BEC5"
-                           FontSize="13"
-                           LineBreakMode="TailTruncation"
-                           VerticalOptions="Center" />
-                </Grid>
+                        <!-- Fichiers 3D détectés (cliquables pour l'aperçu) -->
+                        <Border x:Name="Fichiers3DPanel" IsVisible="False" Padding="12,10">
+                            <VerticalStackLayout Spacing="4">
+                                <Label Text="Fichiers 3D" Style="{StaticResource TitreSection}" />
+                                <CollectionView x:Name="Fichiers3DCollectionView" HeightRequest="120" SelectionMode="Single" SelectionChanged="OnFichier3DSelectionChanged">
+                                    <CollectionView.ItemTemplate>
+                                        <DataTemplate>
+                                            <!-- Chemins d'archive sans espace : CharacterWrap évite
+                                                 qu'ils élargissent la liste. -->
+                                            <Label Text="{Binding Affichage}" Padding="0,4" Style="{StaticResource Lien}" LineBreakMode="CharacterWrap" />
+                                        </DataTemplate>
+                                    </CollectionView.ItemTemplate>
+                                </CollectionView>
+                            </VerticalStackLayout>
+                        </Border>
+                    </VerticalStackLayout>
+                </ScrollView>
 
-                <!-- Zone d'actions (Windows uniquement) -->
-                <HorizontalStackLayout x:Name="WindowsActionsPanel" IsVisible="False" Spacing="10" HorizontalOptions="Start">
-                    <Button x:Name="BtnCreerDossier" 
-                            Text="📁 Créer le dossier" 
-                            BackgroundColor="#2E7D32"
-                            TextColor="White"
-                            FontSize="14"
-                            CornerRadius="5"
-                            HeightRequest="40"
-                            Padding="15,0"
-                            IsVisible="False"
-                            Clicked="OnCreerDossierClicked" />
-                    <Button x:Name="BtnAjouterFichiers" 
-                            Text="📎 Ajouter des fichiers" 
-                            BackgroundColor="#1565C0"
-                            TextColor="White"
-                            FontSize="14"
-                            CornerRadius="5"
-                            HeightRequest="40"
-                            Padding="15,0"
-                            IsVisible="False"
-                            Clicked="OnAjouterFichiersClicked" />
-                    <Button x:Name="BtnRenommerModele" 
-                            Text="✏ Renommer" 
-                            BackgroundColor="#F57F17"
-                            TextColor="White"
-                            FontSize="14"
-                            CornerRadius="5"
-                            HeightRequest="40"
-                            Padding="15,0"
-                            IsVisible="False"
-                            Clicked="OnRenommerModeleClicked" />
+                <!-- Action principale (Windows) -->
+                <VerticalStackLayout x:Name="WindowsActionsPanel" Grid.Row="1" IsVisible="False" Padding="16,8,16,12">
                     <Button x:Name="BtnTeleverserDossier"
-                            Text="📦 Téléverser un dossier"
-                            BackgroundColor="#00695C"
-                            TextColor="White"
-                            FontSize="14"
-                            CornerRadius="5"
-                            HeightRequest="40"
-                            Padding="15,0"
+                            Text="Téléverser un dossier"
+                            Style="{StaticResource Principal}"
                             IsVisible="False"
-                            ToolTipProperties.Text="Copier un dossier déjà nommé (et tout son contenu) dans Famille &gt; Sujet"
+                            ToolTipProperties.Text="Copier un dossier déjà nommé (et tout son contenu) dans Famille &gt; Sujet. Vous pouvez aussi le glisser sur le plateau."
                             Clicked="OnTeleverserDossierClicked" />
-                    <Button x:Name="BtnOuvrirExplorateur" 
-                            Text="📂 Ouvrir le dossier" 
-                            BackgroundColor="#6A1B9A"
-                            TextColor="White"
-                            FontSize="14"
-                            CornerRadius="5"
-                            HeightRequest="40"
-                            Padding="15,0"
-                            IsVisible="False"
-                            Clicked="OnOuvrirExplorateurClicked" />
-        <Button x:Name="BtnActualiserBase"
-                Text="🔄 Actualiser la base"
-                BackgroundColor="#455A64"
-                TextColor="White"
-                FontSize="14"
-                CornerRadius="5"
-                HeightRequest="40"
-                Padding="15,0"
-                HorizontalOptions="Start"
-                Clicked="OnActualiserBaseClicked" />
-                </HorizontalStackLayout>
+                </VerticalStackLayout>
+            </Grid>
 
-                <!-- Zone de dépôt (Windows) : glisser un ou plusieurs dossiers depuis
-                     l'Explorateur, même effet que le bouton « Téléverser un dossier ».
-                     Visible dans les mêmes conditions que ce bouton. -->
-                <Border x:Name="ZoneDepotDossier"
+            <!-- ============ Scène : plateau d'impression ============ -->
+            <Grid x:Name="SceneColonne" Grid.Row="0" Grid.Column="1" RowDefinitions="Auto, *" RowSpacing="8" Padding="16,4,16,12">
+
+                <!-- Progression d'une copie de fichiers ou de dossier -->
+                <Border x:Name="UploadProgressPanel"
+                        Grid.Row="0"
                         IsVisible="False"
-                        Stroke="#00695C"
-                        StrokeThickness="2"
-                        StrokeDashArray="6,4"
-                        BackgroundColor="#1A2B29"
-                        Padding="15,18"
+                        BackgroundColor="{StaticResource ResineFond}"
+                        Padding="12,8">
+                    <VerticalStackLayout Spacing="4">
+                        <Grid ColumnDefinitions="*, Auto">
+                            <Label x:Name="UploadPhaseLabel"
+                                   Grid.Column="0"
+                                   Text=""
+                                   TextColor="{StaticResource Resine}"
+                                   FontFamily="TexteBold"
+                                   FontSize="13"
+                                   LineBreakMode="TailTruncation" />
+                            <Label x:Name="UploadPercentLabel"
+                                   Grid.Column="1"
+                                   Text=""
+                                   FontFamily="TexteBold"
+                                   FontSize="13" />
+                        </Grid>
+                        <ProgressBar x:Name="UploadProgressBar" Progress="0" />
+                    </VerticalStackLayout>
+                </Border>
+
+                <!-- Le plateau : grille et repères d'angle dessinés derrière l'aperçu -->
+                <Border x:Name="ApercuBorder"
+                        Grid.Row="1"
+                        BackgroundColor="{StaticResource PlateauFond}"
+                        Padding="0"
+                        MinimumHeightRequest="220"
                         HorizontalOptions="Fill"
-                        MaximumWidthRequest="445">
-                    <Border.StrokeShape>
-                        <RoundRectangle CornerRadius="6" />
-                    </Border.StrokeShape>
+                        VerticalOptions="Fill">
                     <Border.GestureRecognizers>
                         <DropGestureRecognizer AllowDrop="True"
                                                DragOver="OnDossierDragOver"
                                                DragLeave="OnDossierDragLeave"
                                                Drop="OnDossierDrop" />
                     </Border.GestureRecognizers>
-                    <!-- InputTransparent : le dépôt doit atterrir sur la bordure, pas sur le texte -->
-                    <Label x:Name="ZoneDepotLabel"
-                           InputTransparent="True"
-                           Text="📂  … ou glissez un dossier ici pour le déplacer"
-                           TextColor="#80CBC4"
-                           FontSize="13"
-                           HorizontalTextAlignment="Center" />
-                </Border>
-
-                <!-- Progression d'une copie de fichiers ou de dossier -->
-                <Border x:Name="UploadProgressPanel"
-                        IsVisible="False"
-                        Stroke="#555"
-                        StrokeThickness="1"
-                        BackgroundColor="#1A3A5C"
-                        Padding="15,10">
-                    <VerticalStackLayout Spacing="5">
-                        <Grid ColumnDefinitions="*, Auto">
-                            <Label x:Name="UploadPhaseLabel"
-                                   Grid.Column="0"
-                                   Text=""
-                                   TextColor="#90CAF9"
-                                   FontSize="13"
-                                   FontAttributes="Bold"
-                                   LineBreakMode="TailTruncation" />
-                            <Label x:Name="UploadPercentLabel"
-                                   Grid.Column="1"
-                                   Text=""
-                                   TextColor="#E0E0E0"
-                                   FontSize="13"
-                                   FontAttributes="Bold" />
-                        </Grid>
-                        <ProgressBar x:Name="UploadProgressBar" Progress="0" ProgressColor="#2196F3" />
-                    </VerticalStackLayout>
-                </Border>
-
-                <!-- Contenu du dossier (fichiers et sous-dossiers à la racine) -->
-                <Border x:Name="ContenuDossierPanel" IsVisible="False" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D" Padding="10">
-                    <VerticalStackLayout Spacing="5">
-                        <Label Text="📂 Contenu du dossier" FontSize="14" FontAttributes="Bold" TextColor="#E0E0E0" />
-                        <CollectionView x:Name="ContenuDossierCollectionView" HeightRequest="100">
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate>
-                                    <!-- CharacterWrap : un nom de fichier long sans espace doit
-                                         revenir à la ligne au lieu d'élargir la liste. -->
-                                    <Label Text="{Binding .}" Padding="5,3" TextColor="#CCC" FontSize="13" LineBreakMode="CharacterWrap" />
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!-- Fichiers 3D détectés (cliquables pour aperçu) -->
-                <Border x:Name="Fichiers3DPanel" IsVisible="False" Stroke="#555" StrokeThickness="1" BackgroundColor="#2D2D2D" Padding="10">
-                    <VerticalStackLayout Spacing="5">
-                        <Label Text="🧊 Fichiers 3D" FontSize="14" FontAttributes="Bold" TextColor="#E0E0E0" />
-                        <CollectionView x:Name="Fichiers3DCollectionView" HeightRequest="120" SelectionMode="Single" SelectionChanged="OnFichier3DSelectionChanged">
-                            <CollectionView.ItemTemplate>
-                                <DataTemplate>
-                                    <!-- Chemins d'archive du type « dossier/sous-dossier/piece.stl »
-                                         sans espace : CharacterWrap évite qu'ils élargissent la liste. -->
-                                    <Label Text="{Binding Affichage}" Padding="5,3" TextColor="#4FC3F7" FontSize="13" TextDecorations="Underline" LineBreakMode="CharacterWrap" />
-                                </DataTemplate>
-                            </CollectionView.ItemTemplate>
-                        </CollectionView>
-                    </VerticalStackLayout>
-                </Border>
-
-                <!-- Zone de prévisualisation (image ou viewer 3D).
-                     Hauteur calculée dans le code (AjusterHauteurApercu) : elle prend tout
-                     l'espace laissé libre par les autres éléments, pour que la page tienne
-                     à l'écran sans défilement. La valeur ci-dessous ne sert qu'au premier
-                     affichage, avant le calcul. -->
-                <Border x:Name="ApercuBorder"
-                        Stroke="#555"
-                        StrokeThickness="1"
-                        HeightRequest="{OnIdiom Phone=320, Default=450}"
-                        HorizontalOptions="Fill" 
-                        Margin="0,15,0,0"
-                        BackgroundColor="#2D2D2D">
                     <Grid>
-                        <Image x:Name="ModeleImage" Aspect="AspectFit" Margin="5">
+                        <GraphicsView Drawable="{StaticResource PlateauDrawable}" InputTransparent="True" />
+                        <Image x:Name="ModeleImage" Aspect="AspectFit" Margin="22">
                             <Image.GestureRecognizers>
                                 <TapGestureRecognizer Tapped="OnImageTapped" />
                             </Image.GestureRecognizers>
                         </Image>
                         <WebView x:Name="Viewer3DWebView" IsVisible="False" />
+
+                        <!-- Flèches et compteur posés sur le plateau ; le reste du
+                             calque laisse passer les clics vers l'image ou le viewer. -->
+                        <Grid x:Name="ImageNavPanel"
+                              InputTransparent="True"
+                              CascadeInputTransparent="False"
+                              ColumnDefinitions="Auto, *, Auto"
+                              RowDefinitions="*, Auto"
+                              Padding="26,0,26,22">
+                            <Button x:Name="BtnImagePrecedente"
+                                    Grid.Row="0" Grid.Column="0"
+                                    Text="&#x25C0;"
+                                    BackgroundColor="#D91B1D1C"
+                                    WidthRequest="40"
+                                    HeightRequest="56"
+                                    Padding="0"
+                                    VerticalOptions="Center"
+                                    ToolTipProperties.Text="Image précédente (flèche haut du clavier)"
+                                    Clicked="OnImagePrecedenteClicked" />
+                            <Button x:Name="BtnImageSuivante"
+                                    Grid.Row="0" Grid.Column="2"
+                                    Text="&#x25B6;"
+                                    BackgroundColor="#D91B1D1C"
+                                    WidthRequest="40"
+                                    HeightRequest="56"
+                                    Padding="0"
+                                    VerticalOptions="Center"
+                                    ToolTipProperties.Text="Image suivante (flèche bas du clavier)"
+                                    Clicked="OnImageSuivanteClicked" />
+                            <Label x:Name="ImageCounterLabel"
+                                   Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                                   InputTransparent="True"
+                                   Text=""
+                                   Style="{StaticResource Secondaire}"
+                                   HorizontalOptions="Center" />
+                        </Grid>
+
+                        <!-- Retour aux images (visible quand le viewer 3D est actif) -->
+                        <Button x:Name="BtnRetourImages"
+                                Text="Retour aux images"
+                                BackgroundColor="#D91B1D1C"
+                                HorizontalOptions="Center"
+                                VerticalOptions="Start"
+                                Margin="0,22,0,0"
+                                IsVisible="False"
+                                Clicked="OnRetourImagesClicked" />
+
+                        <!-- Zone de dépôt : n'apparaît que pendant un glisser-déposer au-dessus
+                             du plateau. InputTransparent : le dépôt doit atterrir sur le plateau. -->
+                        <Border x:Name="ZoneDepotDossier"
+                                IsVisible="False"
+                                InputTransparent="True"
+                                Stroke="{StaticResource Ambre}"
+                                StrokeThickness="2"
+                                StrokeDashArray="6,4"
+                                BackgroundColor="#E61B1D1C"
+                                Margin="10"
+                                Padding="15">
+                            <Border.StrokeShape>
+                                <RoundRectangle CornerRadius="8" />
+                            </Border.StrokeShape>
+                            <Label x:Name="ZoneDepotLabel"
+                                   Text="Relâchez pour déplacer le dossier"
+                                   Style="{StaticResource Titre}"
+                                   HorizontalOptions="Center"
+                                   VerticalOptions="Center"
+                                   HorizontalTextAlignment="Center" />
+                        </Border>
                     </Grid>
                 </Border>
+            </Grid>
+        </Grid>
 
-                <!-- Bouton retour aux images (visible quand le viewer 3D est actif) -->
-                <Button x:Name="BtnRetourImages" 
-                        Text="🖼 Retour aux images" 
-                        BackgroundColor="#555" 
-                        TextColor="White" 
-                        FontSize="14" 
-                        CornerRadius="5" 
-                        HeightRequest="40" 
-                        Padding="15,0" 
-                        HorizontalOptions="Center"
-                        IsVisible="False" 
-                        Clicked="OnRetourImagesClicked" />
-
-                <!-- Boutons de navigation des images.
-                     Sur PC : 100 + 80 + 100 dp, comme avant. Sur téléphone, la rangée faisait
-                     320 dp fixes pour ~328 dp disponibles une fois les marges déduites : elle
-                     débordait dès que la taille d'affichage Android était un peu augmentée.
-                     Réduite à 248 dp, elle garde de la marge. -->
-                <HorizontalStackLayout x:Name="ImageNavPanel"
-                                       HorizontalOptions="Center"
-                                       Spacing="{OnIdiom Phone=12, Default=20}"
-                                       Margin="0,10,0,0">
-                    <Button x:Name="BtnImagePrecedente"
-                            Text="&#x25C0;"
-                            FontSize="24"
-                            WidthRequest="{OnIdiom Phone=80, Default=100}"
-                            HeightRequest="45"
-                            BackgroundColor="#166286"
-                            TextColor="White"
-                            CornerRadius="5"
-                            ToolTipProperties.Text="Image précédente (flèche haut du clavier)"
-                            Clicked="OnImagePrecedenteClicked" />
-
-                    <Label x:Name="ImageCounterLabel"
-                           Text=""
-                           TextColor="#E0E0E0"
-                           FontSize="16"
-                           VerticalOptions="Center"
-                           HorizontalOptions="Center"
-                           WidthRequest="{OnIdiom Phone=64, Default=80}"
-                           HorizontalTextAlignment="Center" />
-
-                    <Button x:Name="BtnImageSuivante"
-                            Text="&#x25B6;"
-                            FontSize="24"
-                            WidthRequest="{OnIdiom Phone=80, Default=100}"
-                            HeightRequest="45"
-                            BackgroundColor="#166286"
-                            TextColor="White"
-                            CornerRadius="5"
-                            ToolTipProperties.Text="Image suivante (flèche bas du clavier)"
-                            Clicked="OnImageSuivanteClicked" />
-                </HorizontalStackLayout>
-
-            </VerticalStackLayout>
-        </ScrollView>
-
-        <!-- Panneau de log de debug (repliable) -->
+        <!-- Journal de debug (repliable) -->
         <Border x:Name="DebugLogPanel"
-                Grid.Row="2"
-                Stroke="#444"
-                StrokeThickness="1"
-                BackgroundColor="#1A1A2E"
+                Grid.Row="3"
+                StrokeShape="RoundRectangle 0"
+                StrokeThickness="0"
                 Padding="0">
             <VerticalStackLayout>
-                <Grid Padding="10,6" BackgroundColor="#252542">
+                <BoxView HeightRequest="1" />
+                <Grid Padding="16,6">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
-                    <Label Text="🐛 Journal de debug"
-                           TextColor="#FFB74D"
-                           FontSize="13"
-                           FontAttributes="Bold"
+                    <Label Text="Journal de debug"
+                           Style="{StaticResource Secondaire}"
                            VerticalOptions="Center">
                         <Label.GestureRecognizers>
                             <TapGestureRecognizer Tapped="OnToggleDebugLogClicked" />
@@ -437,19 +410,17 @@
                     </Label>
                     <Button x:Name="BtnClearDebugLog"
                             Grid.Column="1"
-                            Text="🗑"
-                            FontSize="13"
-                            TextColor="#888"
-                            BackgroundColor="Transparent"
-                            Padding="8,0"
+                            Text="Effacer"
+                            FontSize="12"
+                            Style="{StaticResource Discret}"
+                            Padding="10,0"
                             Clicked="OnClearDebugLogClicked" />
                     <Button x:Name="BtnToggleDebugLog"
                             Grid.Column="2"
                             Text="▼"
-                            FontSize="14"
-                            TextColor="#FFB74D"
-                            BackgroundColor="Transparent"
-                            Padding="8,0"
+                            FontSize="12"
+                            Style="{StaticResource Discret}"
+                            Padding="10,0"
                             Clicked="OnToggleDebugLogClicked" />
                 </Grid>
                 <ScrollView x:Name="DebugLogScrollView"
@@ -457,26 +428,25 @@
                             IsVisible="False">
                     <Label x:Name="DebugLogLabel"
                            Text=""
-                           TextColor="#A5D6A7"
+                           TextColor="{StaticResource Succes}"
                            FontSize="11"
                            FontFamily="Consolas"
-                           Padding="10,5"
+                           Padding="16,5"
                            LineBreakMode="WordWrap" />
                 </ScrollView>
             </VerticalStackLayout>
         </Border>
 
         <!-- Overlay plein écran pour agrandir l'image (clic pour fermer) -->
-        <Grid x:Name="ImageOverlay" Grid.RowSpan="3" IsVisible="False" BackgroundColor="#DD000000" ZIndex="100">
+        <Grid x:Name="ImageOverlay" Grid.RowSpan="4" IsVisible="False" BackgroundColor="{StaticResource Voile}" ZIndex="100">
             <Grid.GestureRecognizers>
                 <TapGestureRecognizer Tapped="OnImageOverlayTapped" />
             </Grid.GestureRecognizers>
             <Image x:Name="EnlargedImage" Aspect="AspectFit" Margin="30" />
-            <Label Text="Cliquer pour fermer" 
-                   TextColor="#AAA" 
-                   FontSize="13" 
-                   HorizontalOptions="Center" 
-                   VerticalOptions="End" 
+            <Label Text="Cliquer pour fermer"
+                   Style="{StaticResource Secondaire}"
+                   HorizontalOptions="Center"
+                   VerticalOptions="End"
                    Margin="0,0,0,15" />
         </Grid>
     </Grid>

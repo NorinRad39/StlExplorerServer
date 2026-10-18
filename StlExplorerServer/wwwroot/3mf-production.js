@@ -11,32 +11,40 @@
 // renumerotes pour eviter les collisions) et retire p:path, puis renvoie un
 // 3MF equivalent que le loader sait lire. Un 3MF sans p:path est rendu tel quel.
 //
+// Performances : les parties externes pesent des dizaines de Mo de XML. Elles
+// sont donc manipulees comme du texte (aucun DOM, aucune re-serialisation) et
+// le zip renvoye n'est pas recompresse (niveau 0) : le loader le relit aussitot.
+//
 // Limite assumee : les materiaux (pid/pindex) des objets externes sont ignores,
 // leurs identifiants renvoient a des ressources du fichier d'origine.
 // ------------------------------------------------------------------
 import { unzipSync, zipSync } from './vendor/three/addons/libs/fflate.module.js';
 
-const NS_CORE = 'http://schemas.microsoft.com/3dmanufacturing/core/2015/02';
-const NS_PROD = 'http://schemas.microsoft.com/3dmanufacturing/production/2015/06';
-const ATTRIBUTS_MATERIAU = ['pid', 'pindex', 'p1', 'p2', 'p3'];
-
-function lireXml(octets) {
-  const doc = new DOMParser().parseFromString(new TextDecoder().decode(octets), 'application/xml');
-  if (doc.getElementsByTagName('parsererror').length) {
-    throw new Error('XML invalide dans le fichier 3MF');
-  }
-  return doc;
-}
+const decoder = new TextDecoder();
+const encoder = new TextEncoder();
 
 // Chemin du modele principal, declare dans _rels/.rels (3D/3dmodel.model par defaut).
 function cheminModelePrincipal(fichiers) {
   const rels = fichiers['_rels/.rels'];
   if (rels) {
-    const cible = Array.from(lireXml(rels).getElementsByTagName('Relationship'))
-      .find(r => /3dmodel$/i.test(r.getAttribute('Type') || ''));
-    if (cible) return cible.getAttribute('Target').replace(/^\//, '');
+    const relations = decoder.decode(rels).match(/<Relationship\b[^>]*>/g) || [];
+    for (const relation of relations) {
+      if (/\bType="[^"]*3dmodel"/i.test(relation)) {
+        const cible = relation.match(/\bTarget="([^"]*)"/);
+        if (cible) return cible[1].replace(/^\//, '');
+      }
+    }
   }
   return '3D/3dmodel.model';
+}
+
+// Extrait le texte de <object id="idSource" ...>...</object> (les objets ne s'imbriquent pas).
+function extraireObjet(xml, idSource, partie) {
+  const debut = new RegExp('<object\\b[^>]*\\bid="' + idSource + '"[^>]*>').exec(xml);
+  if (!debut) throw new Error('Objet ' + idSource + ' introuvable dans ' + partie);
+  const fin = xml.indexOf('</object>', debut.index);
+  if (fin < 0) throw new Error('Objet ' + idSource + ' mal forme dans ' + partie);
+  return { balise: debut[0], texte: xml.slice(debut.index, fin + '</object>'.length) };
 }
 
 export function aplatir3mf(buffer) {
@@ -44,48 +52,50 @@ export function aplatir3mf(buffer) {
   const chemin = cheminModelePrincipal(fichiers);
   if (!fichiers[chemin]) return buffer;
 
-  const doc = lireXml(fichiers[chemin]);
-  const composants = Array.from(doc.getElementsByTagNameNS(NS_CORE, 'component'))
-    .filter(c => c.getAttributeNS(NS_PROD, 'path'));
-  if (composants.length === 0) return buffer;
+  let principal = decoder.decode(fichiers[chemin]);
+  if (!/\bp:path="/.test(principal)) return buffer;
 
-  const ressources = doc.getElementsByTagNameNS(NS_CORE, 'resources')[0];
-  let prochainId = 1 + Math.max(0, ...Array.from(ressources.children)
-    .map(r => parseInt(r.getAttribute('id'), 10) || 0));
+  let prochainId = 1 + Math.max(0, ...Array.from(principal.matchAll(/(?<![\w:])id="(\d+)"/g), m => +m[1]));
+  const importes = new Map();   // "partie|idSource" -> nouvel id dans le modele principal
+  const parties = new Map();    // partie -> texte XML (decode une seule fois)
+  const objetsAjoutes = [];
 
-  const importes = new Map();   // "chemin|idSource" -> nouvel id dans le modele principal
-  const partiesImportees = new Set();
+  principal = principal.replace(/<component\b[^>]*>/g, function (balise) {
+    const chemin3mf = balise.match(/\bp:path="([^"]*)"/);
+    if (!chemin3mf) return balise;
 
-  for (const composant of composants) {
-    const partie = composant.getAttributeNS(NS_PROD, 'path').replace(/^\//, '');
-    const idSource = composant.getAttribute('objectid');
+    const partie = chemin3mf[1].replace(/^\//, '');
+    const idSource = (balise.match(/\bobjectid="([^"]*)"/) || [])[1];
     const cle = partie + '|' + idSource;
 
     if (!importes.has(cle)) {
       if (!fichiers[partie]) throw new Error('Partie 3MF introuvable : ' + partie);
-      const objetSource = Array.from(lireXml(fichiers[partie]).getElementsByTagNameNS(NS_CORE, 'object'))
-        .find(o => o.getAttribute('id') === idSource);
-      if (!objetSource) throw new Error('Objet ' + idSource + ' introuvable dans ' + partie);
+      if (!parties.has(partie)) parties.set(partie, decoder.decode(fichiers[partie]));
 
-      const copie = doc.importNode(objetSource, true);
+      const objet = extraireObjet(parties.get(partie), idSource, partie);
       const nouvelId = String(prochainId++);
-      copie.setAttribute('id', nouvelId);
-      for (const el of [copie, ...copie.getElementsByTagNameNS(NS_CORE, 'triangle')]) {
-        ATTRIBUTS_MATERIAU.forEach(a => el.removeAttribute(a));
+      let texte = objet.texte
+        .replace(objet.balise, objet.balise.replace(/\bid="[^"]*"/, 'id="' + nouvelId + '"'));
+      if (/ (pid|pindex|p1|p2|p3)="/.test(texte)) {
+        texte = texte.replace(/ (?:pid|pindex|p1|p2|p3)="[^"]*"/g, '');
       }
-      ressources.appendChild(copie);
+      objetsAjoutes.push(texte);
       importes.set(cle, nouvelId);
-      partiesImportees.add(partie);
     }
 
-    composant.setAttribute('objectid', importes.get(cle));
-    composant.removeAttributeNS(NS_PROD, 'path');
-  }
+    return balise
+      .replace(/\s+p:path="[^"]*"/, '')
+      .replace(/\bobjectid="[^"]*"/, 'objectid="' + importes.get(cle) + '"');
+  });
+
+  const finRessources = principal.lastIndexOf('</resources>');
+  if (finRessources < 0) throw new Error('3MF sans section <resources>');
+  principal = principal.slice(0, finRessources) + objetsAjoutes.join('') + principal.slice(finRessources);
 
   // Les parties importees ne doivent plus etre lues une seconde fois par le loader.
-  partiesImportees.forEach(p => delete fichiers[p]);
-  fichiers[chemin] = new TextEncoder().encode(new XMLSerializer().serializeToString(doc));
+  new Set(Array.from(importes.keys(), c => c.split('|')[0])).forEach(p => delete fichiers[p]);
+  fichiers[chemin] = encoder.encode(principal);
 
-  const zip = zipSync(fichiers);
+  const zip = zipSync(fichiers, { level: 0 });
   return zip.buffer.slice(zip.byteOffset, zip.byteOffset + zip.byteLength);
 }

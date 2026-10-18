@@ -2136,10 +2136,10 @@ namespace StlExplorerClient
             if (_httpClient == null || _modeleCourant == null) return;
 
             var ext = System.IO.Path.GetExtension(fichier.Nom).ToLowerInvariant();
-            if (ext != ".stl" && ext != ".obj")
+            if (ext != ".stl" && ext != ".obj" && ext != ".3mf")
             {
                 await DisplayAlert("Info",
-                    $"L'aperçu 3D n'est disponible que pour les fichiers STL et OBJ.\n(Fichier : {fichier.Nom})",
+                    $"L'aperçu 3D n'est disponible que pour les fichiers STL, OBJ et 3MF.\n(Fichier : {fichier.Nom})",
                     "OK");
                 return;
             }

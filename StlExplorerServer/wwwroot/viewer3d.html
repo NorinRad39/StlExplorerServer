@@ -15,10 +15,16 @@ canvas { display: block; touch-action: none; }
 #info { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
         color: #9AA39D; font-family: sans-serif; font-size: 12px; pointer-events: none;
         text-align: center; max-width: 95%; }
+/* Bascule des couleurs : visible seulement pour les fichiers 3MF. */
+#btn-couleurs { position: absolute; top: 8px; right: 8px; padding: 6px 10px;
+        border: 1px solid #3A403C; border-radius: 6px; background: #222624;
+        color: #C9D1CC; font-family: sans-serif; font-size: 12px; cursor: pointer; }
+#btn-couleurs[hidden] { display: none; }
 </style>
 </head>
 <body>
 <div id="info">Chargement du visualiseur 3D...</div>
+<button id="btn-couleurs" type="button" hidden>Couleurs : activees</button>
 <script>
   // ------------------------------------------------------------------
   // Journal du viewer.
@@ -83,6 +89,7 @@ import * as THREE from './vendor/three/three.module.min.js';
 import { OrbitControls } from './vendor/three/addons/controls/OrbitControls.js';
 import { STLLoader } from './vendor/three/addons/loaders/STLLoader.js';
 import { OBJLoader } from './vendor/three/addons/loaders/OBJLoader.js';
+import { ThreeMFLoader } from './vendor/three/addons/loaders/3MFLoader.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x161817);
@@ -145,6 +152,31 @@ function clearMeshes() {
   scene.children.filter(c => !c.isLight).forEach(c => scene.remove(c));
 }
 
+// ------------------------------------------------------------------
+// Couleurs des 3MF. Un 3MF peut porter ses propres couleurs ou textures :
+// elles sont gardees par defaut, et l'utilisateur peut revenir au gris
+// du viewer (meme rendu que STL/OBJ). Le materiau d'origine de chaque
+// maillage est memorise dans userData au chargement.
+// ------------------------------------------------------------------
+let modeleCourant = null;
+let couleursActives = true;
+const btnCouleurs = document.getElementById('btn-couleurs');
+
+function appliquerMateriaux() {
+  if (!modeleCourant) return;
+  modeleCourant.traverse(c => {
+    if (!c.isMesh) return;
+    c.material = (couleursActives && c.userData.materielOrigine) || mat;
+  });
+  btnCouleurs.textContent = couleursActives ? 'Couleurs : activees' : 'Couleurs : desactivees';
+  btnCouleurs.setAttribute('aria-pressed', String(couleursActives));
+}
+
+btnCouleurs.addEventListener('click', function () {
+  couleursActives = !couleursActives;
+  appliquerMateriaux();
+});
+
 function centerAndFit(obj) {
   const box = new THREE.Box3().setFromObject(obj);
   const center = box.getCenter(new THREE.Vector3());
@@ -206,6 +238,8 @@ function creerSuiviTelechargement() {
 window.loadModel = function (url, extension) {
   reportLog('Telechargement du fichier 3D...', false);
   clearMeshes();
+  modeleCourant = null;
+  btnCouleurs.hidden = true;
   ajusterTaille();
 
   const ext = (extension || '').toLowerCase();
@@ -230,15 +264,34 @@ window.loadModel = function (url, extension) {
       geometry.computeVertexNormals();
       const mesh = new THREE.Mesh(geometry, mat);
       scene.add(mesh);
+      modeleCourant = mesh;
       centerAndFit(mesh);
       onLoaded();
     }, onProgress, onError);
   } else if (ext === '.obj') {
     new OBJLoader().load(url, function (group) {
       surAnalyse();
-      group.traverse(c => { if (c.isMesh) c.material = mat; });
       scene.add(group);
+      modeleCourant = group;
+      appliquerMateriaux();
       centerAndFit(group);
+      onLoaded();
+    }, onProgress, onError);
+  } else if (ext === '.3mf') {
+    new ThreeMFLoader().load(url, function (group) {
+      surAnalyse();
+      // Materiau d'origine (couleurs du 3MF) memorise pour la bascule. Le loader
+      // ne calcule pas les normales : sans elles, l'ombrage serait plat.
+      group.traverse(c => {
+        if (!c.isMesh) return;
+        if (!c.geometry.attributes.normal) c.geometry.computeVertexNormals();
+        c.userData.materielOrigine = c.material;
+      });
+      scene.add(group);
+      modeleCourant = group;
+      appliquerMateriaux();
+      centerAndFit(group);
+      btnCouleurs.hidden = false;
       onLoaded();
     }, onProgress, onError);
   } else {

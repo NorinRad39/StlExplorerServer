@@ -90,6 +90,7 @@ import { OrbitControls } from './vendor/three/addons/controls/OrbitControls.js';
 import { STLLoader } from './vendor/three/addons/loaders/STLLoader.js';
 import { OBJLoader } from './vendor/three/addons/loaders/OBJLoader.js';
 import { ThreeMFLoader } from './vendor/three/addons/loaders/3MFLoader.js';
+import { aplatir3mf } from './3mf-production.js';
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x161817);
@@ -278,8 +279,18 @@ window.loadModel = function (url, extension) {
       onLoaded();
     }, onProgress, onError);
   } else if (ext === '.3mf') {
-    new ThreeMFLoader().load(url, function (group) {
+    const fichier = new THREE.FileLoader();
+    fichier.setResponseType('arraybuffer');
+    fichier.load(url, function (donnees) {
       surAnalyse();
+      let group;
+      try {
+        // Rapatrie les objets externes des 3MF de slicers (voir 3mf-production.js).
+        group = new ThreeMFLoader().parse(aplatir3mf(donnees));
+      } catch (err) {
+        onError(err);
+        return;
+      }
       // Materiau d'origine (couleurs du 3MF) memorise pour la bascule. Le loader
       // ne calcule pas les normales : sans elles, l'ombrage serait plat.
       group.traverse(c => {
